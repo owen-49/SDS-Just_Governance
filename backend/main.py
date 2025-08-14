@@ -1,9 +1,18 @@
 # backend/main.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from api.chat import router as chat_router
 from api.assessment import router as assessment_router
 
 app = FastAPI(title="Just Governance API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # 根据需要添加其他前端地址
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ✅ 根路由：欢迎信息 + 文档入口
 @app.get("/")
