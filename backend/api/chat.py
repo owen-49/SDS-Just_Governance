@@ -1,6 +1,11 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from services.gpt_call import explain_topic, ask_question
+
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ai"])
 
@@ -50,4 +55,5 @@ async def ai_ask(payload: ChatIn):
     except HTTPException:
         raise
     except Exception as e:  # noqa: B902
-        raise HTTPException(status_code=500, detail="AI service error") from e
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
