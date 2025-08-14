@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from services.gpt_call import explain_topic
+from services.gpt_call import explain_topic, ask_question
 
 router = APIRouter(tags=["ai"])
 
@@ -29,4 +29,25 @@ async def ai_explain(payload: ExplainIn):
         raise
     except Exception as e:
         # 不泄露内部错误
+        raise HTTPException(status_code=500, detail="AI service error") from e
+
+
+class ChatIn(BaseModel):
+    question: str = Field(..., description="学员问题")
+    level: str = Field(default="beginner", description="用户水平：beginner/intermediate/advanced")
+
+
+class ChatOut(BaseModel):
+    answer: str
+
+
+@router.post("/ask", response_model=ChatOut)
+async def ai_ask(payload: ChatIn):
+    """General question answering endpoint."""
+    try:
+        resp = await ask_question(payload.question, payload.level)
+        return ChatOut(answer=resp)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: B902
         raise HTTPException(status_code=500, detail="AI service error") from e

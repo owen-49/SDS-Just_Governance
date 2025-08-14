@@ -1,0 +1,40 @@
+{
+  "governance_basics": [
+    {
+      "id": "q1",
+      "question": "What is the primary purpose of corporate governance?",
+      "choices": [
+        "Ensuring compliance with tax laws",
+        "Balancing the interests of stakeholders",
+        "Preparing marketing campaigns",
+        "Designing product features"
+      ],
+      "answer": "B",
+      "topic": "purpose"
+    },
+    {
+      "id": "q2",
+      "question": "Who typically holds fiduciary duties in a corporation?",
+      "choices": [
+        "Shareholders",
+        "Board directors",
+        "Employees",
+        "Customers"
+      ],
+      "answer": "B",
+      "topic": "board_roles"
+    },
+    {
+      "id": "q3",
+      "question": "Which document often outlines the rights of shareholders?",
+      "choices": [
+        "Articles of association",
+        "Invoice",
+        "Employment contract",
+        "Internal memo"
+      ],
+      "answer": "A",
+      "topic": "shareholder_rights"
+    }
+  ]
+}
