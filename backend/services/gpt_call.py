@@ -73,3 +73,30 @@ async def explain_topic(module_id: str, subtopic: str, known_points: list[str], 
             explanation=text,
             checklist=[],
         ).model_dump()
+
+
+async def ask_question(question: str, level: str) -> str:
+    """Simple question answering based on user level."""
+    tmpl = _load_prompt_template()
+    system_prompt = tmpl.get("system", "")
+    style = tmpl.get("style", {})
+    guardrails = tmpl.get("guardrails", "")
+
+    user_content = {
+        "task": "answer_question",
+        "question": question,
+        "level": level,
+        "style": style,
+        "guardrails": guardrails,
+    }
+
+    resp = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": json.dumps(user_content, ensure_ascii=False)},
+        ],
+        temperature=0.5,
+    )
+
+    return resp.choices[0].message.content.strip()

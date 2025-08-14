@@ -1,6 +1,7 @@
 # backend/main.py
 from fastapi import FastAPI
 from api.chat import router as chat_router
+from api.assessment import router as assessment_router
 
 app = FastAPI(title="Just Governance API", version="0.1.0")
 
@@ -22,3 +23,4 @@ def healthz():
 
 # AI 路由
 app.include_router(chat_router, prefix="/ai")
+app.include_router(assessment_router)
