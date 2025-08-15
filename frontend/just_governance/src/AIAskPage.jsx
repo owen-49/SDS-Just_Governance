@@ -5,26 +5,39 @@ export default function AIAskPage() {
   const [question, setQuestion] = useState("");
   const [level, setLevel] = useState("beginner");
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
   const handleSubmit = async () => {
-    const res = await aiAsk(question, level);
-    setResult(res);
+    setLoading(true);
+    setErr("");
+    try {
+      const res = await aiAsk(question, level);
+      setResult(res);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div>
-      <h2>AI 问答</h2>
+      <h2>AI Q&A</h2>
       <input
-        placeholder="请输入你的问题"
+        placeholder="Enter your question"
         value={question}
         onChange={e => setQuestion(e.target.value)}
       />
       <select value={level} onChange={e => setLevel(e.target.value)}>
-        <option value="beginner">初级</option>
-        <option value="intermediate">中级</option>
-        <option value="advanced">高级</option>
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
       </select>
-      <button onClick={handleSubmit}>提问</button>
+      <button onClick={handleSubmit} disabled={loading}>
+        {loading ? "Asking..." : "Ask"}
+      </button>
+      {err && <p style={{ color: "red" }}>Error: {err}</p>}
       {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
     </div>
   );

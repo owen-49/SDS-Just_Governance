@@ -1,8 +1,22 @@
-const API_BASE = "http://172.19.123.100:8000";
+// Consider changing this to an environment variable or relative path for production.
+const API_BASE = "http://localhost:8000";
+
+async function handleJSON(res, defaultErrMsg) {
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = await res.text();
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`${defaultErrMsg}: ${res.status} ${detail}`);
+  }
+  return res.json();
+}
+
 export async function getQuestionnaire(moduleId) {
   const res = await fetch(`${API_BASE}/assessment/${moduleId}`);
-  if (!res.ok) throw new Error("加载问卷失败");
-  return res.json();
+  return handleJSON(res, "Failed to load questionnaire");
 }
 
 export async function gradeAnswers(moduleId, answers) {
@@ -11,18 +25,21 @@ export async function gradeAnswers(moduleId, answers) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ module_id: moduleId, answers }),
   });
-  if (!res.ok) throw new Error("评分失败");
-  return res.json();
+  return handleJSON(res, "Grading failed");
 }
 
-export async function aiExplain(moduleId, subtopic, knownPoints, level) {
+export async function aiExplain(moduleId, subtopic, knownPointsArray, level) {
   const res = await fetch(`${API_BASE}/ai/explain`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ module_id: moduleId, subtopic, known_points: knownPoints, level }),
+    body: JSON.stringify({
+      module_id: moduleId,
+      subtopic,
+      known_points: knownPointsArray,
+      level
+    }),
   });
-  if (!res.ok) throw new Error("AI 讲解失败");
-  return res.json();
+  return handleJSON(res, "AI explanation failed");
 }
 
 export async function aiAsk(question, level) {
@@ -31,6 +48,5 @@ export async function aiAsk(question, level) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, level }),
   });
-  if (!res.ok) throw new Error("AI 问答失败");
-  return res.json();
+  return handleJSON(res, "AI Q&A failed");
 }
