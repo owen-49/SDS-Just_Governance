@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: blanchedalmond;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      width: 350px;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .tabs {
+      display: flex;
+      margin-bottom: 15px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+      background: #eee;
+    }
+    .tab.active {
+      background: #4CAF50;
+      color: white;
+      font-weight: bold;
+    }
+    .form {
+      display: none;
+    }
+    .form.active {
+      display: block;
+    }
+    .link {
+      text-align: center;
+      margin-top: 10px;
+    }
+    .link a {
+      text-decoration: none;
+      color: #2196F3;
+      cursor: pointer;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+    }
+    .footer a {
+      color: #555;
+      text-decoration: none;
+      margin: 0 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 id="title">login/ register</h2>
+    
+    <div class="tabs" id="tabs">
+      <div id="loginTab" class="tab active" onclick="showForm('login')">login</div>
+      <div id="registerTab" class="tab" onclick="showForm('register')">register</div>
+    </div>
+
+    <!-- 登录表单 -->
+    <form id="loginForm" class="form active" onsubmit="return validateLogin()">
+      <input type="email" id="login-email" placeholder="email">
+      <input type="password" id="login-password" placeholder="password">
+      <button type="submit">login</button>
+      <div class="link">
+        <a onclick="showForm('forgot')">forget password?</a>
+      </div>
+    </form>
+
+    <!-- 注册表单 -->
+    <form id="registerForm" class="form" onsubmit="return validateRegister()">
+      <input type="email" id="reg-email" placeholder="email">
+      <input type="password" id="reg-password" placeholder="password">
+      <input type="password" id="reg-confirm" placeholder="confirm password">
+      <input type="text" id="reg-name" placeholder="name(optional)">
+      <label>
+        <input type="checkbox" id="reg-terms"> I agree to the terms of service.
+      </label>
+      <button type="submit">register</button>
+    </form>
+
+    <!-- 忘记密码 -->
+    <form id="forgotForm" class="form" onsubmit="return sendResetEmail()">
+      <input type="email" id="forgot-email" placeholder="enter your email">
+      <button type="submit">send reset email</button>
+      <div class="link">
+        <a onclick="showForm('login')">back to login</a>
+      </div>
+    </form>
+
+    <!-- 设置新密码 -->
+    <form id="resetForm" class="form" onsubmit="return resetPassword()">
+      <input type="password" id="new-password" placeholder="new password">
+      <input type="password" id="confirm-password" placeholder="confirm password">
+      <button type="submit">reset password</button>
+      <div class="link">
+        <a onclick="showForm('forgot')">resend email</a>
+      </div>
+    </form>
+
+    <!-- 重置成功提示 -->
+    <div id="successMsg" class="form">
+      <p style="text-align:center;">Password reset successful!</p>
+      <button onclick="showForm('login')">Go to login</button>
+    </div>
+
+    <div class="footer">
+      <a href="#">Terms of Service</a> | <a href="#">Privacy Policy</a>
+    </div>
+  </div>
+
+  <script>
+    function showForm(type) {
+      // 隐藏所有表单
+      ['loginForm','registerForm','forgotForm','resetForm','successMsg'].forEach(id=>{
+        document.getElementById(id).classList.remove('active');
+      });
+      // 移除 tab 激活状态
+      document.getElementById("loginTab").classList.remove("active");
+      document.getElementById("registerTab").classList.remove("active");
+      document.getElementById("tabs").style.display = (type==='login'||type==='register') ? 'flex':'none';
+
+      if(type==='login'){
+        document.getElementById("loginForm").classList.add("active");
+        document.getElementById("loginTab").classList.add("active");
+        document.getElementById("title").innerText = "login/ register";
+      } else if(type==='register'){
+        document.getElementById("registerForm").classList.add("active");
+        document.getElementById("registerTab").classList.add("active");
+        document.getElementById("title").innerText = "login/ register";
+      } else if(type==='forgot'){
+        document.getElementById("forgotForm").classList.add("active");
+        document.getElementById("title").innerText = "reset password";
+      } else if(type==='reset'){
+        document.getElementById("resetForm").classList.add("active");
+        document.getElementById("title").innerText = "set new password";
+      } else if(type==='success'){
+        document.getElementById("successMsg").classList.add("active");
+        document.getElementById("title").innerText = "success";
+      }
+    }
+
+    // 登录验证
+    function validateLogin() {
+      let email = document.getElementById("login-email").value.trim();
+      let password = document.getElementById("login-password").value.trim();
+
+      if (!email || !password) {
+        alert("please enter email and password");
+        return false;
+      }
+
+      // 模拟分支
+      if (email === "nouser@test.com") {
+        alert("The account does not exist, please register first.");
+      } else if (password !== "123456") {
+        alert("Incorrect password, please try again or click on forgot password.");
+      } else if (email === "unverified@test.com") {
+        alert("Email not verified, please complete verification first.");
+      } else {
+        alert("Login successful!（模拟：弹出项目简介）");
+      }
+      return false;
+    }
+
+    // 注册验证
+    function validateRegister() {
+      let email = document.getElementById("reg-email").value.trim();
+      let password = document.getElementById("reg-password").value.trim();
+      let confirm = document.getElementById("reg-confirm").value.trim();
+      let terms = document.getElementById("reg-terms").checked;
+
+      if (!email || !password || !confirm) {
+        alert("Please fill out the complete information.");
+        return false;
+      }
+      if (password !== confirm) {
+        alert("The passwords do not match.");
+        return false;
+      }
+      if (!terms) {
+        alert("Please agree to the terms of service.");
+        return false;
+      }
+      if (email === "exist@test.com") {
+        alert("This email has already been registered, please log in.");
+        showForm('login');
+        return false;
+      }
+      alert("Registration successful! Please verify your email.");
+      return false;
+    }
+
+    // 发送重置邮件
+    function sendResetEmail() {
+      let email = document.getElementById("forgot-email").value.trim();
+      if(!email){
+        alert("Please enter your email.");
+        return false;
+      }
+
+      // 模拟邮箱不存在/已发送
+      if(email === "nouser@test.com"){
+        alert("If not registered, please register first."); // 不暴露是否存在
+      } else {
+        alert("Reset email sent!（模拟）");
+      }
+
+      // 跳转到重置密码页面（模拟点击邮件链接）
+      setTimeout(()=>showForm('reset'), 500);
+      return false;
+    }
+
+    // 设置新密码
+    function resetPassword() {
+      let newPwd = document.getElementById("new-password").value.trim();
+      let confirmPwd = document.getElementById("confirm-password").value.trim();
+
+      if(!newPwd || !confirmPwd){
+        alert("Please enter new password and confirm.");
+        return false;
+      }
+      if(newPwd !== confirmPwd){
+        alert("Passwords do not match.");
+        return false;
+      }
+
+      alert("Password reset successful!");
+      showForm('success');
+      return false;
+    }
+  </script>
+</body>
+</html>
