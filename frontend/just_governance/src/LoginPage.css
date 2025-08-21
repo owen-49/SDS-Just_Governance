@@ -1,0 +1,172 @@
+.login-container {
+  font-family: Arial, sans-serif;
+  background-color: blanchedalmond;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.login-form-container {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 350px;
+}
+
+.login-form-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.tabs {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  cursor: pointer;
+  background: #eee;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s ease;
+}
+
+.tab:first-child {
+  border-radius: 4px 0 0 0;
+}
+
+.tab:last-child {
+  border-radius: 0 4px 0 0;
+}
+
+.tab.active {
+  background: #4CAF50;
+  color: white;
+  font-weight: bold;
+}
+
+.tab:hover:not(.active) {
+  background: #ddd;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+}
+
+.form button {
+  width: 100%;
+  padding: 12px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.form button:hover {
+  background-color: #45a049;
+}
+
+.form button:active {
+  background-color: #3d8b40;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.link {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.link a {
+  text-decoration: none;
+  color: #2196F3;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.link a:hover {
+  color: #0b7dda;
+  text-decoration: underline;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 12px;
+  color: #666;
+}
+
+.footer a {
+  color: #555;
+  text-decoration: none;
+  margin: 0 5px;
+  transition: color 0.3s ease;
+}
+
+.footer a:hover {
+  color: #2196F3;
+  text-decoration: underline;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 10px;
+  }
+  
+  .login-form-container {
+    padding: 20px;
+  }
+  
+  .tab {
+    padding: 8px;
+    font-size: 14px;
+  }
+  
+  .form input,
+  .form button {
+    padding: 10px;
+  }
+}
