@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { aiAsk } from "./api";
+import { aiAsk } from "./lib/api";
 
 export default function AIAskPage() {
   const [question, setQuestion] = useState("");
