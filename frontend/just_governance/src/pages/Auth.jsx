@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import './LoginPage.css';
-import { dbApi } from './localDb';
+import '../styles/auth.css';
+import { dbApi } from '../lib/localDb';
 
 const LoginPage = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState('login');
@@ -55,8 +55,12 @@ const LoginPage = ({ onLoginSuccess }) => {
       setActiveTab('login');
       return;
     }
-    setStage('verify');
-    setBanner('Verify your email · A verification email was sent.');
+    // 自动登录新注册的用户
+    setBanner('Account created successfully!');
+    const loginRes = dbApi.login(regEmail, regPassword);
+    if (loginRes.ok) {
+      onLoginSuccess?.(loginRes.user);
+    }
   };
 
   const onResendVerify = () => {
@@ -133,6 +137,24 @@ const LoginPage = ({ onLoginSuccess }) => {
                 <input type="email" name="loginEmail" value={formData.loginEmail} onChange={handleInputChange} placeholder="Email" required />
                 <input type="password" name="loginPassword" value={formData.loginPassword} onChange={handleInputChange} placeholder="Password" required />
                 <button type="submit">Sign In</button>
+                
+                {/* 快速测试登录 */}
+                <div style={{ margin: '10px 0', padding: '10px', background: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '12px', color: '#0369a1', marginBottom: '8px' }}>Quick Test Login:</div>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      dbApi.createTestAccounts();
+                      setFormData(prev => ({ ...prev, loginEmail: 'test@example.com', loginPassword: '123456' }));
+                      const res = dbApi.login('test@example.com', '123456');
+                      if (res.ok) onLoginSuccess?.(res.user);
+                    }}
+                    style={{ width: '100%', padding: '8px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px' }}
+                  >
+                    Use Test Account (test@example.com / 123456)
+                  </button>
+                </div>
+                
                 <div className="link">
                   <a href="#forgot" onClick={(e) => { e.preventDefault(); setStage('forgot'); }}>Forgot Password?</a>
                 </div>
