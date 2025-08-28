@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learning platform structure</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- 顶部栏 -->
+    <header class="topbar" role="banner">
+      <button id="hamburger" class="btn ghost" aria-label="Open navigation"><span class="icon">☰</span></button>
+      <a class="brand" href="#" id="goHome" title="Return to homepage">
+        <div class="logo" aria-hidden="true"></div>
+        <span>Learning platform</span>
+      </a>
+      <div class="spacer"></div>
+      <nav aria-label="Main operation" style="display:flex; gap:8px; align-items:center">
+        <button id="startJourney" class="btn primary">start your journey</button>
+        <button id="projectInfo" class="btn" title="Project Overview"><span class="icon">ℹ️</span><span>Project Overview</span></button>
+        <button id="notify" class="btn" title="Notice"><span class="icon">🔔</span></button>
+        <div class="profile-menu" style="position:relative">
+          <button id="profileBtn" class="btn"><span class="avatar" style="width:24px;height:24px;font-size:12px">YY</span><span>personal information</span></button>
+          <div id="profileDropdown" class="card" style="position:absolute; right:0; top:44px; width:220px; display:none">
+            <div class="bd" style="display:flex; flex-direction:column; gap:8px">
+              <a href="#" id="openProfile">personal information</a>
+              <a href="#" id="openSettings">settings</a>
+              <hr/>
+              <a href="#" id="logout">quit</a>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <!-- 桌面侧边栏 -->
+      <aside id="sidebar" class="sidebar" aria-label="Left navigation">
+        <div class="top-placeholder"></div>
+        <div class="tree" id="tree"></div>
+        <div class="profile">
+          <div class="profile-row">
+            <div class="avatar">Y</div>
+            <div>
+              <div style="font-weight:700">Yiyang Yuan</div>
+              <div style="font-size:12px;color:var(--muted)">learner</div>
+            </div>
+          </div>
+        </div>
+        <div class="copyright">© 2025 v1.0</div>
+      </aside>
+
+      <!-- 主区域 -->
+      <main class="main">
+        <section class="content">
+          <div class="card" style="height:100%">
+            <div class="hd" id="topicTitle">welcome</div>
+            <div class="bd" style="height:calc(100% - 58px); display:flex; flex-direction:column">
+              <div class="tabs" role="tablist">
+                <button class="tab active" role="tab" aria-selected="true" id="tab-content">content</button>
+                <button class="tab" role="tab" aria-selected="false" id="tab-chat">conversation</button>
+              </div>
+              <div class="tab-panel" id="panel-content" role="tabpanel">
+                <h2>Start exploring</h2>
+                <p>Select a topic from the left side to view knowledge points, key points, recommended links, and quick self-checks.</p>
+              </div>
+              <div class="tab-panel" id="panel-chat" role="tabpanel" hidden>
+                <h2>Dedicated chat room</h2>
+                <p>This is an independent discussion area linked to the current topic (placeholder).</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- 窄屏抽屉 -->
+      <nav id="drawer" class="drawer card" aria-label="Drawer navigation">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 12px; border-bottom:1px solid var(--border)">
+          <div class="brand"><div class="logo"></div><span>navigation</span></div>
+          <button id="drawerClose" class="btn">×</button>
+        </div>
+        <div class="tree" id="drawerTree" style="height:calc(100% - 56px); padding:12px"></div>
+      </nav>
+      <div class="drawer-mask" id="drawerMask"></div>
+    </div>
+  </div>
+
+  <!-- 模态框：项目概述 -->
+  <dialog id="infoModal" class="modal"></dialog>
+  <dialog id="journeyModal" class="modal"></dialog>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
