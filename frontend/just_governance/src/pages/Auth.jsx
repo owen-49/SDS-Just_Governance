@@ -18,8 +18,10 @@ const LoginPage = ({ onLoginSuccess }) => {
     resetPassword1: '',
     resetPassword2: ''
   });
-  const [stage, setStage] = useState('auth'); // auth | forgot | reset | verify
+  const [stage, setStage] = useState('auth'); // auth | forgot | reset | verify | oauth_profile | oauth_bind
   const [banner, setBanner] = useState('');
+  const [verify, setVerify] = useState({ email: '', token: '' });
+  const [oauthCtx, setOauthCtx] = useState(null); // { provider, provider_account_id, email?, user? }
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -37,7 +39,15 @@ const LoginPage = ({ onLoginSuccess }) => {
     if (!res.ok) {
       if (res.code === 'no_account') setBanner('Account not found · Go to Sign Up');
       else if (res.code === 'wrong_password') setBanner('Incorrect password · Forgot Password?');
-      else if (res.code === 'unverified') setBanner('Please verify your email first');
+      else if (res.code === 'unverified') {
+        setBanner('Please verify your email first');
+        // 发送验证邮件并进入验证页
+        const r = dbApi.createEmailVerificationToken(loginEmail);
+        if (r.ok) {
+          setVerify({ email: loginEmail, token: r.token });
+          setStage('verify');
+        }
+      }
       return;
     }
     onLoginSuccess?.(res.user);
@@ -55,29 +65,33 @@ const LoginPage = ({ onLoginSuccess }) => {
       setActiveTab('login');
       return;
     }
-    // 自动登录新注册的用户
-    setBanner('Account created successfully!');
-    const loginRes = dbApi.login(regEmail, regPassword);
-    if (loginRes.ok) {
-      onLoginSuccess?.(loginRes.user);
-    }
+    // 注册成功→发送验证邮件并跳到验证页
+    const r = dbApi.createEmailVerificationToken(regEmail);
+    if (r.ok) setVerify({ email: regEmail, token: r.token });
+    setBanner('Verify your email · A verification link has been sent');
+    setStage('verify');
   };
 
   const onResendVerify = () => {
-    const email = formData.regEmail || formData.loginEmail;
+    const email = verify.email || formData.regEmail || formData.loginEmail;
     if (!email) return setBanner('Enter your email then resend');
-    dbApi.resendVerification(email);
+    const r = dbApi.createEmailVerificationToken(email);
+    if (r.ok) setVerify({ email, token: r.token });
     setBanner('Verification email resent');
   };
 
   const onDoVerify = () => {
-    const email = formData.regEmail || formData.loginEmail;
-    if (!email) return setBanner('Missing email to verify');
-    const r = dbApi.verifyEmail(email);
+    if (!verify.token || !verify.email) return setBanner('Missing verification link');
+    const r = dbApi.consumeEmailVerificationToken(verify.token);
     if (!r.ok) return setBanner('Link expired · Resend verification email');
     setBanner('Email verified');
-    const login = dbApi.login(email, (formData.regPassword || formData.loginPassword));
-    if (login.ok) onLoginSuccess?.(login.user);
+    const tryPwd = formData.regPassword || formData.loginPassword || '';
+    if (tryPwd) {
+      const login = dbApi.login(verify.email, tryPwd);
+      if (login.ok) return onLoginSuccess?.(login.user);
+    }
+    setActiveTab('login');
+    setStage('auth');
   };
 
   const onForgot = (e) => {
@@ -102,9 +116,32 @@ const LoginPage = ({ onLoginSuccess }) => {
   };
 
   const ThirdPartyButtons = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
+    <div className="third-party-buttons">
       {['Google', 'Microsoft', 'LinkedIn', 'Apple'].map(p => (
-        <button key={p} onClick={() => setBanner('Authorization not completed')} style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6, background: '#fff' }}>{p}</button>
+        <button key={p} className="third-party-btn" onClick={() => {
+          try {
+            const provider = p.toLowerCase();
+            const provider_account_id = Math.random().toString(36).slice(2);
+            const res = dbApi.oauthFindOrCreate(provider, provider_account_id, {});
+            if (res.ok && res.isNew) {
+              // 首次授权：进入完善资料，不立刻登录跳转
+              setOauthCtx({ provider, provider_account_id, email: res.user.email, user: res.user });
+              setStage('oauth_profile');
+              setBanner('Complete your profile to continue');
+            } else if (res.ok) {
+              onLoginSuccess?.(res.user);
+            } else if (res.code === 'bind_required') {
+              // 需要绑定到现有本地账号
+              setOauthCtx({ provider, provider_account_id, email: res.email });
+              setStage('oauth_bind');
+              setBanner('Account Binding required');
+            } else {
+              setBanner('Authorization not completed');
+            }
+          } catch {
+            setBanner('Authorization not completed');
+          }
+        }} >{p}</button>
       ))}
     </div>
   );
@@ -113,7 +150,29 @@ const LoginPage = ({ onLoginSuccess }) => {
     <div className="login-container">
       <div className="login-form-container">
         <h2>Sign In / Sign Up</h2>
-        {banner && <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', color: '#7c2d12', padding: 8, borderRadius: 6, marginBottom: 8 }}>{banner}</div>}
+        {banner && (
+          <div className={`banner ${
+            banner.includes('Please') || 
+            banner.includes('Incorrect') || 
+            banner.includes('not found') || 
+            banner.includes('expired') || 
+            banner.includes('not completed') || 
+            banner.includes('failed') || 
+            banner.includes('Missing') || 
+            banner.includes('do not match') || 
+            banner.includes('already registered') || 
+            banner.includes('accept the terms')
+              ? 'error' 
+              : banner.includes('successfully') || 
+                banner.includes('verified') || 
+                banner.includes('resent') || 
+                banner.includes('sent')
+              ? 'success' 
+              : ''
+          }`}>
+            {banner}
+          </div>
+        )}
 
         {stage === 'auth' && (
           <>
@@ -144,12 +203,10 @@ const LoginPage = ({ onLoginSuccess }) => {
                   <button 
                     type="button" 
                     onClick={() => {
-                      dbApi.createTestAccounts();
-                      setFormData(prev => ({ ...prev, loginEmail: 'test@example.com', loginPassword: '123456' }));
-                      const res = dbApi.login('test@example.com', '123456');
+                      const res = dbApi.createTestAccountsAndLogin();
                       if (res.ok) onLoginSuccess?.(res.user);
                     }}
-                    style={{ width: '100%', padding: '8px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px' }}
+                    className="test-login-btn"
                   >
                     Use Test Account (test@example.com / 123456)
                   </button>
@@ -178,6 +235,44 @@ const LoginPage = ({ onLoginSuccess }) => {
           </>
         )}
 
+        {/* 第三方：完善资料 */}
+        {stage === 'oauth_profile' && (
+          <div className="form">
+            <div>Complete Profile</div>
+            <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>Signed in with {oauthCtx?.provider}. Please confirm your name and accept the terms.</div>
+            <input type="text" name="regName" value={formData.regName} onChange={handleInputChange} placeholder="Name" />
+            <label className="checkbox-label">
+              <input type="checkbox" name="regTerms" checked={formData.regTerms} onChange={handleInputChange} />
+              I accept the terms
+            </label>
+            <button onClick={() => {
+              if (!formData.regTerms) return setBanner('Please accept the terms');
+              if (oauthCtx?.user?.id) {
+                const upd = dbApi.updateUserProfile(oauthCtx.user.id, { name: formData.regName });
+                if (upd.ok) return onLoginSuccess?.(upd.user);
+              }
+              // 兜底：直接继续
+              onLoginSuccess?.(oauthCtx?.user);
+            }}>Continue</button>
+            <div className="link"><a href="#back" onClick={(e)=>{e.preventDefault(); setStage('auth'); setBanner('');}}>Back</a></div>
+          </div>
+        )}
+
+        {/* 第三方：账号绑定 */}
+        {stage === 'oauth_bind' && (
+          <div className="form">
+            <div>Account Binding</div>
+            <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>Bind your {oauthCtx?.provider} account to an existing local account.</div>
+            <input type="email" name="loginEmail" value={formData.loginEmail || oauthCtx?.email || ''} onChange={handleInputChange} placeholder="Email" />
+            <input type="password" name="loginPassword" value={formData.loginPassword} onChange={handleInputChange} placeholder="Password" />
+            <button onClick={() => {
+              const r = dbApi.oauthBind(formData.loginEmail || oauthCtx?.email, formData.loginPassword, oauthCtx?.provider, oauthCtx?.provider_account_id);
+              if (r.ok) onLoginSuccess?.(r.user); else if (r.code === 'wrong_password') setBanner('Incorrect password'); else setBanner('Binding failed');
+            }}>Bind & Continue</button>
+            <div className="link"><a href="#back" onClick={(e)=>{e.preventDefault(); setStage('auth'); setBanner('');}}>Back</a></div>
+          </div>
+        )}
+
         {stage === 'forgot' && (
           <form onSubmit={onForgot} className="form">
             <input type="email" name="forgotEmail" value={formData.forgotEmail} onChange={handleInputChange} placeholder="Enter your email" required />
@@ -204,16 +299,17 @@ const LoginPage = ({ onLoginSuccess }) => {
         {stage === 'verify' && (
           <div className="form">
             <div>Verify your email</div>
+            <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>We sent a verification link to {verify.email || formData.regEmail || formData.loginEmail}.</div>
             <button onClick={onDoVerify}>Click verification link (simulate)</button>
             <button onClick={onResendVerify}>Resend verification email</button>
             <div className="link">
-              <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back to Sign In</a>
+              <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back</a>
             </div>
           </div>
         )}
 
         <div className="footer">
-          <a href="#terms">Terms of Service</a> | <a href="#privacy">Privacy Policy</a>
+          <a href="/terms" style={{ textDecoration: 'underline', color: '#2563eb' }}>Terms of Service</a> | <a href="/privacy" style={{ textDecoration: 'underline', color: '#2563eb' }}>Privacy Policy</a>
         </div>
       </div>
     </div>

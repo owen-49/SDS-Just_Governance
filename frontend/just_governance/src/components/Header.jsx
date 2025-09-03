@@ -1,32 +1,252 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverview, onProfile, onSignOut, user }) {
   return (
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '10px 16px', background: '#fff', borderBottom: '1px solid #eee'
+      padding: '12px 20px', 
+      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+      borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+      backdropFilter: 'blur(10px)',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onToggleSidebar} aria-label="Toggle navigation" style={{ padding: '8px 10px' }}>☰</button>
-        <div onClick={() => window.dispatchEvent(new CustomEvent('jg:goHome'))} style={{ cursor: 'pointer', fontWeight: 700 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <button 
+          onClick={onToggleSidebar} 
+          aria-label="Toggle navigation" 
+          style={{ 
+            padding: '10px 12px',
+            background: 'rgba(37, 99, 235, 0.1)',
+            border: '1px solid rgba(37, 99, 235, 0.2)',
+            borderRadius: '8px',
+            color: '#2563eb',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            fontSize: '16px'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.background = 'rgba(37, 99, 235, 0.15)';
+            e.target.style.transform = 'scale(1.05)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.background = 'rgba(37, 99, 235, 0.1)';
+            e.target.style.transform = 'scale(1)';
+          }}
+        >
+          ☰
+        </button>
+        <Link 
+          to="/" 
+          style={{ 
+            textDecoration: 'none', 
+            fontWeight: 700, 
+            fontSize: '18px',
+            color: '#0f172a',
+            cursor: 'pointer',
+            background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            transition: 'transform 0.2s ease'
+          }}
+          onMouseOver={(e) => e.target.style.transform = 'scale(1.02)'}
+          onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+        >
           Just Governance
-        </div>
+        </Link>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button onClick={onStartAssessment} style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 6 }}>Start your governance journey</button>
-        <button onClick={onOpenOverview} title="Project Overview" style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff' }}>ℹ️ Project Overview</button>
-        <button title="Notifications" style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff' }}>🔔</button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button 
+          onClick={onStartAssessment} 
+          style={{ 
+            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            color: '#fff', 
+            border: 'none', 
+            padding: '10px 16px', 
+            borderRadius: '8px',
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+          }}
+        >
+          Start your governance journey
+        </button>
+        <button 
+          onClick={onOpenOverview} 
+          title="Project Overview" 
+          style={{ 
+            padding: '10px 12px', 
+            borderRadius: '8px', 
+            border: '1px solid rgba(226, 232, 240, 0.8)', 
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            fontSize: '16px'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.background = 'rgba(255, 255, 255, 1)';
+            e.target.style.transform = 'translateY(-1px)';
+            e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = 'none';
+          }}
+        >
+          ℹ️ Project Overview
+        </button>
+        <button 
+          title="Notifications" 
+          style={{ 
+            padding: '10px 12px', 
+            borderRadius: '8px', 
+            border: '1px solid rgba(226, 232, 240, 0.8)', 
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            fontSize: '16px',
+            position: 'relative'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.background = 'rgba(255, 255, 255, 1)';
+            e.target.style.transform = 'translateY(-1px)';
+            e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = 'none';
+          }}
+        >
+          🔔
+        </button>
         <div style={{ position: 'relative' }}>
           <details>
-            <summary style={{ listStyle: 'none', cursor: 'pointer' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#ddd', display: 'inline-block' }} />
-                <span>{user?.name || user?.email}</span>
+            <summary style={{ 
+              listStyle: 'none', 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(226, 232, 240, 0.8)'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = 'rgba(255, 255, 255, 1)';
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+            >
+              <span style={{ 
+                width: 32, 
+                height: 32, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                color: '#475569'
+              }}>
+                {(user?.name || user?.email || 'U')[0].toUpperCase()}
               </span>
+              <span style={{ fontWeight: 500, color: '#0f172a' }}>{user?.name || user?.email}</span>
             </summary>
-            <div style={{ position: 'absolute', right: 0, top: '110%', background: '#fff', border: '1px solid #eee', borderRadius: 8, minWidth: 200, boxShadow: '0 6px 24px rgba(0,0,0,0.08)' }}>
-              <button onClick={onProfile} style={{ width: '100%', textAlign: 'left', padding: 10, border: 'none', background: 'transparent' }}>Profile & Settings</button>
-              <button onClick={onSignOut} style={{ width: '100%', textAlign: 'left', padding: 10, border: 'none', background: 'transparent', color: '#b91c1c' }}>Sign Out</button>
+            <div style={{ 
+              position: 'absolute', 
+              right: 0, 
+              top: '110%', 
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(226, 232, 240, 0.8)', 
+              borderRadius: '12px', 
+              minWidth: 220, 
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              overflow: 'hidden'
+            }}>
+              <button 
+                onClick={onProfile} 
+                style={{ 
+                  width: '100%', 
+                  textAlign: 'left', 
+                  padding: '12px 16px', 
+                  border: 'none', 
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease',
+                  fontSize: '14px',
+                  color: '#374151'
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
+              >
+                👤 Profile & Settings
+              </button>
+              <Link 
+                to="/welcome" 
+                style={{ 
+                  display: 'block', 
+                  width: '100%', 
+                  textAlign: 'left', 
+                  padding: '12px 16px', 
+                  textDecoration: 'none', 
+                  color: '#374151',
+                  transition: 'background 0.2s ease',
+                  fontSize: '14px',
+                  borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
+              >
+                🎯 Getting Started
+              </Link>
+              <button 
+                onClick={onSignOut} 
+                style={{ 
+                  width: '100%', 
+                  textAlign: 'left', 
+                  padding: '12px 16px', 
+                  border: 'none', 
+                  background: 'transparent', 
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease',
+                  fontSize: '14px'
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(220, 38, 38, 0.08)'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
+              >
+                🚪 Sign Out
+              </button>
             </div>
           </details>
         </div>

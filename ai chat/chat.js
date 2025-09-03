@@ -3,7 +3,7 @@ const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 
-const AI_ENDPOINT = null; // 预留接口，设置为你的后端地址
+const AI_ENDPOINT = 'http://localhost:8000/ai/ask'; // Backend AI endpoint
 
 // 加载历史记录
 let messages = JSON.parse(localStorage.getItem('ai-chat-history')) || [];
@@ -37,7 +37,7 @@ function saveMessages() {
 }
 
 async function simulateOrFetchAIResponse(userText) {
-  addMessage('AI Entering...', 'ai');
+  addMessage('AI is thinking...', 'ai');
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
   if (AI_ENDPOINT) {
@@ -45,18 +45,27 @@ async function simulateOrFetchAIResponse(userText) {
       const res = await fetch(AI_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: userText })
+        body: JSON.stringify({ 
+          question: userText,
+          level: "beginner" // You can make this dynamic based on user profile
+        })
       });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const data = await res.json();
-      const aiReply = data.reply || 'AI Unable to generate a response';
+      const aiReply = data.answer || 'AI unable to generate a response';
       replaceLastAIMessage(aiReply);
       messages.push({ text: aiReply, role: 'ai' });
       saveMessages();
     } catch (error) {
-      replaceLastAIMessage('The request failed, try again later.');
+      console.error('AI request failed:', error);
+      replaceLastAIMessage('Request failed, please try again later. Make sure the backend server is running.');
     }
   } else {
-    // 模拟回复
+    // Simulate response
     setTimeout(() => {
       const aiReply = 'This is a mock response from the AI: ' + userText;
       replaceLastAIMessage(aiReply);
