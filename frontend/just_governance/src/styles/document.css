@@ -1,0 +1,459 @@
+/* 美化后的文档页面样式 */
+.document-wrapper {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.document-layout {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 30px;
+  font-family: inherit;
+  line-height: 1.7;
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  min-height: calc(100vh - 60px);
+  box-shadow: -24px 0 48px -24px rgba(14, 21, 32, 0.12), 0 20px 60px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.document-header {
+  border-bottom: 3px solid linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  padding-bottom: 20px;
+  margin-bottom: 40px;
+  position: relative;
+}
+
+.document-header::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 100px;
+  height: 3px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-radius: 2px;
+}
+
+.document-title {
+  font-size: 2.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.5px;
+}
+
+.document-updated {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0;
+  font-style: normal;
+  font-weight: 500;
+  background: rgba(107, 114, 128, 0.1);
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.document-content {
+  font-size: 1.1rem;
+  color: #374151;
+}
+
+.document-content h2 {
+  color: #1f2937;
+  font-size: 1.8rem;
+  margin: 40px 0 20px 0;
+  border-left: 5px solid #2563eb;
+  padding-left: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.document-content h3 {
+  color: #374151;
+  font-size: 1.4rem;
+  margin: 30px 0 15px 0;
+  font-weight: 600;
+  position: relative;
+}
+
+.document-content h3::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 8px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 50%;
+}
+
+.document-content p {
+  margin: 0 0 20px 0;
+  color: #4b5563;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.document-content ul,
+.document-content ol {
+  margin: 20px 0;
+  padding-left: 30px;
+}
+
+.document-content li {
+  margin: 8px 0;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.document-content strong {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.document-content em {
+  color: #7c3aed;
+  font-style: italic;
+}
+
+.document-content code {
+  background: rgba(107, 114, 128, 0.1);
+  color: #dc2626;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+}
+
+.document-content blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding: 20px 30px;
+  margin: 30px 0;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-radius: 8px;
+  font-style: italic;
+  color: #6b7280;
+  position: relative;
+}
+
+.document-content blockquote::before {
+  content: '"';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 3rem;
+  color: rgba(37, 99, 235, 0.2);
+  font-family: serif;
+}
+
+.document-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 30px 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.document-content th,
+.document-content td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.document-content th {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  font-weight: 600;
+  color: #374151;
+}
+
+.document-content tr:last-child td {
+  border-bottom: none;
+}
+
+.document-content tr:hover {
+  background: rgba(37, 99, 235, 0.02);
+}
+
+.document-navigation {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 16px 30px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.document-navigation h4 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.document-navigation ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.document-navigation li {
+  margin: 0;
+}
+
+.document-navigation a {
+  display: inline-block;
+  padding: 8px 16px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  text-decoration: none;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.document-navigation a:hover {
+  background: rgba(37, 99, 235, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.document-navigation a:active {
+  transform: translateY(0);
+}
+
+/* 介绍性问卷特殊样式 */
+.intro-questionnaire {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.questionnaire-intro {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.progress-indicator {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #007bff;
+  transition: width 0.3s ease;
+}
+
+.section-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.nav-button {
+  padding: 10px 15px;
+  border: 2px solid #dee2e6;
+  background: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.nav-button.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.nav-button.completed {
+  background: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.question-section h2 {
+  color: #2c3e50;
+  margin-bottom: 25px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #007bff;
+}
+
+.question-item {
+  margin-bottom: 25px;
+}
+
+.question-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #495057;
+}
+
+.required {
+  color: #dc3545;
+  margin-left: 4px;
+}
+
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.checkbox-label:hover {
+  background-color: #f8f9fa;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin: 0;
+}
+
+.form-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #dee2e6;
+}
+
+.nav-prev, .nav-next, .submit-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.nav-prev {
+  background: #6c757d;
+  color: white;
+}
+
+.nav-prev:hover {
+  background: #5a6268;
+}
+
+.nav-next, .submit-button {
+  background: #007bff;
+  color: white;
+}
+
+.nav-next:hover, .submit-button:hover {
+  background: #0056b3;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .document-layout {
+    padding: 15px;
+    margin: 0;
+    box-shadow: none;
+  }
+  
+  .document-title {
+    font-size: 2rem;
+  }
+  
+  .document-navigation {
+    display: none;
+  }
+  
+  .section-navigation {
+    flex-direction: column;
+  }
+  
+  .checkbox-group {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-navigation {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .document-navigation {
+    display: none;
+  }
+  
+  .document-layout {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  
+  .document-title {
+    color: black;
+  }
+  
+  .document-content h2 {
+    color: black;
+    border-left: none;
+    padding-left: 0;
+  }
+}

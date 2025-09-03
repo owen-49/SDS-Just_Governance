@@ -35,52 +35,318 @@ function GlobalChat({ email }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr auto', height: 'calc(100vh - 56px)' }}>
-      <div style={{ padding: 8, borderBottom: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
-        <select value={currentId || ''} onChange={(e) => setCurrentId(e.target.value)}>
+    <div style={{ 
+      display: 'grid', 
+      gridTemplateRows: 'auto 1fr auto', 
+      height: 'calc(100vh - 56px)',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+    }}>
+      <div style={{ 
+        padding: '16px 20px', 
+        borderBottom: '1px solid rgba(226, 232, 240, 0.8)', 
+        display: 'flex', 
+        gap: 12, 
+        alignItems: 'center',
+        background: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(10px)'
+      }}>
+        <select 
+          value={currentId || ''} 
+          onChange={(e) => setCurrentId(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            fontSize: '14px',
+            color: '#374151',
+            cursor: 'pointer',
+            minWidth: '200px'
+          }}
+        >
           {list.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
         </select>
-        <button onClick={newConv}>New Conversation</button>
+        <button 
+          onClick={newConv}
+          style={{
+            padding: '8px 16px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 600,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.transform = 'translateY(-1px)';
+            e.target.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+          }}
+        >
+          ➕ New Conversation
+        </button>
         {current && (
-          <details>
-            <summary>More</summary>
-            <div style={{ position: 'absolute', background: '#fff', border: '1px solid #eee', padding: 8 }}>
-              <button onClick={() => {
-                const title = prompt('Rename conversation', current.title) || current.title;
-                setList(prev => prev.map(c => c.id === current.id ? { ...c, title } : c));
-              }}>Rename</button>
-              <button onClick={() => {
-                if (window.confirm('Delete this conversation?')) {
-                  setList(prev => prev.filter(c => c.id !== current.id));
-                  setCurrentId(null);
-                }
-              }}>Delete</button>
+          <details style={{ position: 'relative' }}>
+            <summary style={{
+              listStyle: 'none',
+              cursor: 'pointer',
+              padding: '8px 12px',
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#6b7280'
+            }}>
+              ⋯ More
+            </summary>
+            <div style={{ 
+              position: 'absolute', 
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(226, 232, 240, 0.8)', 
+              padding: '8px', 
+              borderRadius: '8px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              zIndex: 10,
+              minWidth: '150px'
+            }}>
+              <button 
+                onClick={() => {
+                  const title = prompt('Rename conversation', current.title) || current.title;
+                  setList(prev => prev.map(c => c.id === current.id ? { ...c, title } : c));
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#374151',
+                  borderRadius: '4px',
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
+              >
+                ✏️ Rename
+              </button>
+              <button 
+                onClick={() => {
+                  if (window.confirm('Delete this conversation?')) {
+                    setList(prev => prev.filter(c => c.id !== current.id));
+                    setCurrentId(null);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#dc2626',
+                  borderRadius: '4px',
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(220, 38, 38, 0.08)'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
+              >
+                🗑️ Delete
+              </button>
             </div>
           </details>
         )}
       </div>
-      <div style={{ padding: 16, overflow: 'auto' }}>
+      <div style={{ 
+        padding: '20px', 
+        overflow: 'auto',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+      }}>
         {!current && (
-          <div style={{ textAlign: 'center', color: '#64748b', marginTop: 60 }}>
-            <p>No conversations yet.</p>
-            <button onClick={newConv}>Start New Conversation</button>
+          <div style={{ 
+            textAlign: 'center', 
+            color: '#64748b', 
+            marginTop: 80,
+            padding: '40px 20px'
+          }}>
+            <div style={{
+              fontSize: '48px',
+              marginBottom: '16px',
+              opacity: 0.6
+            }}>
+              💬
+            </div>
+            <h3 style={{ 
+              margin: '0 0 12px 0', 
+              color: '#374151',
+              fontSize: '20px',
+              fontWeight: 600
+            }}>
+              No conversations yet
+            </h3>
+            <p style={{ margin: '0 0 24px 0', fontSize: '16px' }}>
+              Start a new conversation to begin your governance journey
+            </p>
+            <button 
+              onClick={newConv}
+              style={{
+                padding: '12px 24px',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 600,
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+              }}
+            >
+              🚀 Start New Conversation
+            </button>
           </div>
         )}
         {current && (
-          <div style={{ maxWidth: 800, margin: '0 auto' }}>
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
             {current.messages.map((m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', margin: '8px 0' }}>
-                <div style={{ background: m.role === 'user' ? '#2563eb' : '#e2e8f0', color: m.role === 'user' ? '#fff' : '#111827', padding: '8px 12px', borderRadius: 12, maxWidth: '75%' }}>
-                  {m.text}
+              <div key={i} style={{ 
+                display: 'flex', 
+                justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', 
+                margin: '16px 0',
+                animation: 'messageSlideIn 0.3s ease-out'
+              }}>
+                <div style={{ 
+                  background: m.role === 'user' 
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                    : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  color: m.role === 'user' ? '#fff' : '#111827', 
+                  padding: '12px 16px', 
+                  borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                  maxWidth: '70%',
+                  boxShadow: m.role === 'user' 
+                    ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
+                    : '0 2px 8px rgba(0, 0, 0, 0.08)',
+                  border: m.role === 'user' ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
+                  position: 'relative'
+                }}>
+                  {m.role === 'ai' && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      left: '12px',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '8px solid transparent',
+                      borderRight: '8px solid transparent',
+                      borderBottom: '8px solid rgba(255, 255, 255, 0.9)'
+                    }}></div>
+                  )}
+                  {m.role === 'user' && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '12px',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '8px solid transparent',
+                      borderRight: '8px solid transparent',
+                      borderBottom: '8px solid #1d4ed8'
+                    }}></div>
+                  )}
+                  <div style={{ fontSize: '15px', lineHeight: '1.5' }}>
+                    {m.text}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
-        <textarea rows={2} style={{ flex: 1 }} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything..." />
-        <button onClick={send}>Send</button>
+      <div style={{ 
+        padding: '16px 20px', 
+        borderTop: '1px solid rgba(226, 232, 240, 0.8)', 
+        display: 'flex', 
+        gap: 12,
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(10px)'
+      }}>
+        <textarea 
+          rows={2} 
+          style={{ 
+            flex: 1,
+            padding: '12px 16px',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            borderRadius: '12px',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            fontSize: '15px',
+            resize: 'none',
+            outline: 'none',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+          }}
+          value={input} 
+          onChange={(e) => setInput(e.target.value)} 
+          placeholder="Ask anything about governance..."
+          onFocus={(e) => {
+            e.target.style.borderColor = '#2563eb';
+            e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+            e.target.style.boxShadow = 'none';
+          }}
+        />
+        <button 
+          onClick={send}
+          disabled={!input.trim()}
+          style={{
+            padding: '12px 20px',
+            background: input.trim() 
+              ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+              : 'rgba(156, 163, 175, 0.5)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: input.trim() ? 'pointer' : 'not-allowed',
+            fontSize: '15px',
+            fontWeight: 600,
+            transition: 'all 0.2s ease',
+            boxShadow: input.trim() ? '0 4px 12px rgba(37, 99, 235, 0.3)' : 'none'
+          }}
+          onMouseOver={(e) => {
+            if (input.trim()) {
+              e.target.style.transform = 'translateY(-1px)';
+              e.target.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.4)';
+            }
+          }}
+          onMouseOut={(e) => {
+            if (input.trim()) {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+            }
+          }}
+        >
+          📤 Send
+        </button>
       </div>
     </div>
   );
