@@ -5,6 +5,208 @@ import Modal from '../components/Modal';
 import AssessmentModal from '../components/AssessmentModal';
 import { dbApi } from '../lib/localDb';
 import { findTopicById } from '../data/structure';
+import { aiAsk } from '../lib/api';
+
+// 统一的 Markdown 格式化组件
+const FormattedMessage = ({ text, role }) => {
+  if (!text) return '';
+  
+  // 处理行内 Markdown 格式的辅助函数
+  const formatInlineMarkdown = (text) => {
+    if (!text) return '';
+    
+    // 处理行内代码
+    const parts = text.split(/(`[^`]+`)/);
+    return parts.map((part, index) => {
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return (
+          <code key={index} style={{
+            background: role === 'user' ? 'rgba(255,255,255,0.2)' : 'rgba(107, 114, 128, 0.1)',
+            color: role === 'user' ? 'rgba(255,255,255,0.9)' : '#dc2626',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontFamily: '"Fira Code", "Monaco", monospace',
+            fontSize: '0.9em'
+          }}>
+            {part.slice(1, -1)}
+          </code>
+        );
+      } else {
+        // 处理加粗文本 **text**
+        const boldParts = part.split(/(\*\*[^*]+\*\*)/);
+        return boldParts.map((boldPart, boldIndex) => {
+          if (boldPart.startsWith('**') && boldPart.endsWith('**') && boldPart.length > 4) {
+            return <strong key={`${index}-${boldIndex}`}>{boldPart.slice(2, -2)}</strong>;
+          } else {
+            // 处理斜体文本 *text*
+            const italicParts = boldPart.split(/(\*[^*]+\*)/);
+            return italicParts.map((italicPart, italicIndex) => {
+              if (italicPart.startsWith('*') && italicPart.endsWith('*') && italicPart.length > 2 && !italicPart.includes('**')) {
+                return <em key={`${index}-${boldIndex}-${italicIndex}`}>{italicPart.slice(1, -1)}</em>;
+              } else {
+                return italicPart;
+              }
+            });
+          }
+        });
+      }
+    });
+  };
+  
+  // 先处理代码块（多行）
+  const codeBlockParts = text.split(/(```[\s\S]*?```)/);
+  
+  return (
+    <div style={{ fontSize: '16px', lineHeight: '1.7' }}>
+      {codeBlockParts.map((part, index) => {
+        if (part.startsWith('```') && part.endsWith('```') && part.length > 6) {
+          const code = part.slice(3, -3).trim();
+          const lines = code.split('\n');
+          const language = lines[0] && !lines[0].includes(' ') ? lines[0] : '';
+          const codeContent = language ? lines.slice(1).join('\n') : code;
+          
+          return (
+            <pre key={index} style={{
+              background: role === 'user' ? 'rgba(255,255,255,0.15)' : '#1f2937',
+              color: role === 'user' ? 'rgba(255,255,255,0.95)' : '#e5e7eb',
+              padding: '16px',
+              borderRadius: '8px',
+              margin: '12px 0',
+              overflow: 'auto',
+              fontFamily: '"Fira Code", "Monaco", monospace',
+              fontSize: '0.9em',
+              lineHeight: '1.4',
+              position: 'relative'
+            }}>
+              {language && (
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '12px',
+                  fontSize: '11px',
+                  color: role === 'user' ? 'rgba(255,255,255,0.7)' : '#9ca3af',
+                  textTransform: 'uppercase',
+                  fontWeight: 500
+                }}>
+                  {language}
+                </div>
+              )}
+              <code>{codeContent}</code>
+            </pre>
+          );
+        }
+        
+        // 处理段落和其他元素
+        const lines = part.split('\n');
+        return lines.map((line, lineIndex) => {
+          // 处理标题
+          if (line.startsWith('### ')) {
+            return (
+              <h3 key={`${index}-${lineIndex}`} style={{
+                fontSize: '1.25em',
+                fontWeight: 'bold',
+                margin: '16px 0 8px 0',
+                color: role === 'user' ? 'inherit' : '#1f2937'
+              }}>
+                {formatInlineMarkdown(line.slice(4))}
+              </h3>
+            );
+          }
+          if (line.startsWith('## ')) {
+            return (
+              <h2 key={`${index}-${lineIndex}`} style={{
+                fontSize: '1.5em',
+                fontWeight: 'bold',
+                margin: '20px 0 10px 0',
+                color: role === 'user' ? 'inherit' : '#1f2937'
+              }}>
+                {formatInlineMarkdown(line.slice(3))}
+              </h2>
+            );
+          }
+          if (line.startsWith('# ')) {
+            return (
+              <h1 key={`${index}-${lineIndex}`} style={{
+                fontSize: '1.75em',
+                fontWeight: 'bold',
+                margin: '24px 0 12px 0',
+                color: role === 'user' ? 'inherit' : '#1f2937'
+              }}>
+                {formatInlineMarkdown(line.slice(2))}
+              </h1>
+            );
+          }
+          
+          // 处理引用
+          if (line.startsWith('> ')) {
+            return (
+              <blockquote key={`${index}-${lineIndex}`} style={{
+                borderLeft: role === 'user' ? '4px solid rgba(255,255,255,0.5)' : '4px solid #3b82f6',
+                background: role === 'user' ? 'rgba(255,255,255,0.1)' : 'rgba(59, 130, 246, 0.05)',
+                padding: '12px 16px',
+                margin: '12px 0',
+                fontStyle: 'italic',
+                color: 'inherit'
+              }}>
+                {formatInlineMarkdown(line.slice(2))}
+              </blockquote>
+            );
+          }
+          
+          // 处理列表项
+          if (line.match(/^[\s]*[-*+]\s/)) {
+            return (
+              <div key={`${index}-${lineIndex}`} style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                margin: '4px 0',
+                paddingLeft: '16px'
+              }}>
+                <span style={{ 
+                  marginRight: '8px', 
+                  color: role === 'user' ? 'rgba(255,255,255,0.8)' : '#3b82f6'
+                }}>•</span>
+                <span>{formatInlineMarkdown(line.replace(/^[\s]*[-*+]\s/, ''))}</span>
+              </div>
+            );
+          }
+          
+          // 处理有序列表
+          if (line.match(/^[\s]*\d+\.\s/)) {
+            const number = line.match(/^[\s]*(\d+)\./)[1];
+            return (
+              <div key={`${index}-${lineIndex}`} style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                margin: '4px 0',
+                paddingLeft: '16px'
+              }}>
+                <span style={{ 
+                  marginRight: '8px', 
+                  color: role === 'user' ? 'rgba(255,255,255,0.8)' : '#3b82f6',
+                  fontWeight: 'bold' 
+                }}>{number}.</span>
+                <span>{formatInlineMarkdown(line.replace(/^[\s]*\d+\.\s/, ''))}</span>
+              </div>
+            );
+          }
+          
+          // 空行处理
+          if (line.trim() === '') {
+            return <br key={`${index}-${lineIndex}`} />;
+          }
+          
+          // 普通段落
+          return (
+            <p key={`${index}-${lineIndex}`} style={{ margin: '8px 0', lineHeight: '1.6' }}>
+              {formatInlineMarkdown(line)}
+            </p>
+          );
+        });
+      })}
+    </div>
+  );
+};
 
 function GlobalChat({ email }) {
   const [list, setList] = useState(() => dbApi.globalConvs(email));
@@ -14,24 +216,142 @@ function GlobalChat({ email }) {
 
   useEffect(() => { dbApi.saveGlobalConvs(email, list); }, [email, list]);
 
+  // 迁移历史对话标题（一次性）
+  useEffect(() => {
+    const needsMigration = list.some(conv => 
+      conv.title.includes('对话 #') || 
+      (conv.title === 'New Conversation' && !conv.title.includes('#'))
+    );
+    if (needsMigration) {
+      const migratedList = list.map((conv, index) => {
+        if (conv.title.includes('对话 #') || (conv.title === 'New Conversation' && !conv.title.includes('#'))) {
+          // 使用对话的创建时间或第一条消息时间
+          const timestamp = conv.messages.length > 0 ? conv.messages[0].ts : conv.updatedAt;
+          const date = new Date(timestamp || Date.now());
+          const timeString = date.toLocaleString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+          
+          const firstUserMessage = conv.messages.find(m => m.role === 'user');
+          const number = list.length - index;
+          
+          if (firstUserMessage) {
+            const cleanMessage = firstUserMessage.text.trim().replace(/\n/g, ' ');
+            const messageTitle = cleanMessage.length <= 30 ? cleanMessage : cleanMessage.substring(0, 27) + '...';
+            return { ...conv, title: `#${number} ${messageTitle} - ${timeString}` };
+          } else {
+            return { ...conv, title: `#${number} New Conversation - ${timeString}` };
+          }
+        }
+        return conv;
+      });
+      setList(migratedList);
+    }
+  }, [list, setList]);
+
+  // 根据消息内容生成标题的辅助函数
+  const generateTitleFromMessage = (message) => {
+    const now = new Date();
+    const timeString = now.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    // 计算下一个对话编号
+    const existingNumbers = list
+      .map(conv => {
+        const match = conv.title.match(/#(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter(num => num > 0);
+    
+    const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+    
+    if (!message || message.trim().length === 0) {
+      return `#${nextNumber} New Conversation - ${timeString}`;
+    }
+    
+    // 截取前30个字符作为标题内容
+    const cleanMessage = message.trim().replace(/\n/g, ' ');
+    const messageTitle = cleanMessage.length <= 30 ? cleanMessage : cleanMessage.substring(0, 27) + '...';
+    
+    return `#${nextNumber} ${messageTitle} - ${timeString}`;
+  };
+
   const newConv = () => {
     const id = Math.random().toString(36).slice(2);
-    const c = { id, title: 'New Conversation', messages: [], updatedAt: Date.now() };
+    
+    // 生成带编号和时间的默认标题
+    const now = new Date();
+    const timeString = now.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    // 计算下一个对话编号
+    const existingNumbers = list
+      .map(conv => {
+        const match = conv.title.match(/#(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter(num => num > 0);
+    
+    const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+    const title = `#${nextNumber} New Conversation - ${timeString}`;
+    
+    const c = { id, title, messages: [], updatedAt: Date.now() };
     setList(prev => [c, ...prev]);
     setCurrentId(id);
   };
 
-  const send = () => {
+  const send = async () => {
     if (!current) return;
     const text = input.trim();
     if (!text) return;
-    const aiReply = `Thanks for your question: "${text}". Here's a brief suggestion...`;
+    
+    // 检查是否是第一条消息，如果是则更新标题
+    const isFirstMessage = current.messages.length === 0;
+    const newTitle = isFirstMessage ? generateTitleFromMessage(text) : current.title;
+    
+    // 先添加用户消息，如果是第一条消息同时更新标题
     setList(prev => prev.map(c => c.id === current.id ? {
       ...c,
-      messages: [...c.messages, { role: 'user', text, ts: Date.now() }, { role: 'ai', text: aiReply, ts: Date.now() }],
+      title: newTitle,
+      messages: [...c.messages, { role: 'user', text, ts: Date.now() }],
       updatedAt: Date.now()
     } : c));
     setInput('');
+    
+    try {
+      // 调用后端API获取AI回复
+      const response = await aiAsk(text, 'beginner');
+      const aiReply = response.answer || 'Sorry, I could not process your question.';
+      
+      // 添加AI回复
+      setList(prev => prev.map(c => c.id === current.id ? {
+        ...c,
+        messages: [...c.messages, { role: 'ai', text: aiReply, ts: Date.now() }],
+        updatedAt: Date.now()
+      } : c));
+    } catch (error) {
+      console.error('AI API call failed:', error);
+      // 添加错误提示
+      setList(prev => prev.map(c => c.id === current.id ? {
+        ...c,
+        messages: [...c.messages, { role: 'ai', text: 'Sorry, I encountered an error while processing your question. Please try again.', ts: Date.now() }],
+        updatedAt: Date.now()
+      } : c));
+    }
   };
 
   return (
@@ -239,9 +559,9 @@ function GlobalChat({ email }) {
                     ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
                     : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                   color: m.role === 'user' ? '#fff' : '#111827', 
-                  padding: '12px 16px', 
-                  borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                  maxWidth: '70%',
+                  padding: '16px 20px', 
+                  borderRadius: m.role === 'user' ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
+                  maxWidth: '80%',
                   boxShadow: m.role === 'user' 
                     ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
                     : '0 2px 8px rgba(0, 0, 0, 0.08)',
@@ -272,9 +592,7 @@ function GlobalChat({ email }) {
                       borderBottom: '8px solid #1d4ed8'
                     }}></div>
                   )}
-                  <div style={{ fontSize: '15px', lineHeight: '1.5' }}>
-                    {m.text}
-                  </div>
+                  <FormattedMessage text={m.text} role={m.role} />
                 </div>
               </div>
             ))}
@@ -491,9 +809,20 @@ function TopicPage({ topicId, email }) {
               <div style={{ color: '#64748b' }}>Try: "Explain the main risks in this topic"</div>
             )}
             {chat.messages.map((m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', margin: '8px 0' }}>
-                <div style={{ background: m.role === 'user' ? '#2563eb' : '#e2e8f0', color: m.role === 'user' ? '#fff' : '#111827', padding: '8px 12px', borderRadius: 12, maxWidth: '75%' }}>
-                  {m.text}
+              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', margin: '12px 0' }}>
+                <div style={{ 
+                  background: m.role === 'user' 
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                    : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', 
+                  color: m.role === 'user' ? '#fff' : '#111827', 
+                  padding: '12px 16px', 
+                  borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', 
+                  maxWidth: '85%',
+                  boxShadow: m.role === 'user' 
+                    ? '0 3px 8px rgba(37, 99, 235, 0.25)' 
+                    : '0 2px 6px rgba(0, 0, 0, 0.06)'
+                }}>
+                  <FormattedMessage text={m.text} role={m.role} />
                 </div>
               </div>
             ))}
