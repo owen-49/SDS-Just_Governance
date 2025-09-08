@@ -36,15 +36,15 @@ export const dbApi = {
   register(email, password, name) {
     const db = readDB();
     ensure(db, 'users', []);
-    // 兼容旧数据的去重
+    // Deduplication for legacy data compatibility
     if (db.users.find(u => u.email === email)) {
       return { ok: false, code: 'exists' };
     }
     const user = {
       id: uid(),
       email,
-      email_verified_at: null, // 注册后默认未验证
-      password_hash: password, // demo 中明文存储
+      email_verified_at: null, // Default unverified after registration
+      password_hash: password, // Plain text storage in demo
       name: name || email.split('@')[0],
       avatar_url: null,
       first_login_at: null,
