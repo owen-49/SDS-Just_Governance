@@ -31,16 +31,12 @@ const IntroductoryQuestions = () => {
   const [limitMsg, setLimitMsg] = useState('');
   const [savedAt, setSavedAt] = useState(null);
   const [score, setScore] = useState(null);
-  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     const rec = dbApi.getLatestIntroQuestionnaire();
     if (rec?.data) {
       setAnswers(prev => ({ ...prev, ...rec.data }));
       setSavedAt(rec.created_at);
-      if (rec.data.score) {
-        setScore(rec.data.score);
-      }
     }
   }, []);
 
@@ -137,63 +133,6 @@ const IntroductoryQuestions = () => {
     else return 'Strong Understanding';
   };
 
-  const getDetailedRecommendations = (score) => {
-    const category = getScoreCategory(score);
-    
-    if (category === 'New to Governance') {
-      return {
-        title: 'New to Governance',
-        description: 'Limited or no familiarity with governance concepts. You\'ll benefit from foundational training with extra support.',
-        recommendations: [
-          'Start with basic governance concepts and terminology',
-          'Take advantage of plain-language explanations and examples',
-          'Don\'t hesitate to ask questions during training sessions',
-          'Consider pairing with a more experienced participant as a learning buddy',
-          'Focus on building confidence through practice scenarios'
-        ],
-        nextSteps: [
-          'Complete Module 1: "What is Governance?" as your starting point',
-          'Review the governance glossary before each session',
-          'Attend optional Q&A sessions for additional support'
-        ]
-      };
-    } else if (category === 'Developing Understanding') {
-      return {
-        title: 'Developing Understanding',
-        description: 'You have some experience or partial knowledge. You\'re ready to deepen your skills with guided learning.',
-        recommendations: [
-          'Build on your existing knowledge with intermediate concepts',
-          'Participate actively in group discussions and case studies',
-          'Focus on practical applications of governance principles',
-          'Connect new learning to your previous experiences',
-          'Take on leadership roles in group exercises'
-        ],
-        nextSteps: [
-          'Start with Module 2: "Board Roles and Responsibilities"',
-          'Consider volunteering for practice scenarios',
-          'Join peer discussion groups to share experiences'
-        ]
-      };
-    } else {
-      return {
-        title: 'Strong Understanding',
-        description: 'You\'re already confident with governance concepts. You could contribute actively and might benefit from advanced materials.',
-        recommendations: [
-          'Focus on advanced governance topics and current best practices',
-          'Mentor others who are new to governance',
-          'Contribute your experience to group discussions',
-          'Explore specialized areas like risk management or strategic planning',
-          'Consider pursuing board positions in organizations you care about'
-        ],
-        nextSteps: [
-          'Jump to Module 4: "Advanced Governance Practices"',
-          'Consider becoming a peer mentor',
-          'Explore real board opportunities in your community'
-        ]
-      };
-    }
-  };
-
   const onSubmit = (e) => {
     e.preventDefault();
     const finalScore = calculateScore();
@@ -202,14 +141,7 @@ const IntroductoryQuestions = () => {
     const res = dbApi.saveIntroQuestionnaire({ ...answers, score: finalScore });
     if (res.ok) {
       setSavedAt(res.record.created_at);
-      setShowResults(true);
-      // Scroll to results
-      setTimeout(() => {
-        const resultsElement = document.getElementById('results-section');
-        if (resultsElement) {
-          resultsElement.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
+      alert(`Thank you! Your responses have been recorded. Your score: ${finalScore}/30 - ${getScoreCategory(finalScore)}`);
     } else if (res.code === 'not_logged_in') {
       alert('Please sign in before submitting.');
     } else {
@@ -623,227 +555,6 @@ const IntroductoryQuestions = () => {
           Submit Questionnaire
         </button>
       </form>
-
-      {/* Results Section */}
-      {showResults && score !== null && (
-        <div id="results-section" style={{ 
-          marginTop: '40px', 
-          padding: '32px', 
-          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-          borderRadius: '16px',
-          border: '2px solid #0ea5e9',
-          boxShadow: '0 8px 32px rgba(14, 165, 233, 0.15)'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <h2 style={{ 
-              color: '#0c4a6e', 
-              fontSize: '28px', 
-              fontWeight: '700',
-              marginBottom: '8px' 
-            }}>
-              🎉 Assessment Complete!
-            </h2>
-            <p style={{ fontSize: '18px', color: '#0369a1', marginBottom: '16px' }}>
-              Thank you for completing the Just Governance questionnaire.
-            </p>
-            
-            <div style={{
-              display: 'inline-block',
-              background: 'linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)',
-              color: 'white',
-              padding: '16px 32px',
-              borderRadius: '12px',
-              fontSize: '24px',
-              fontWeight: '700',
-              boxShadow: '0 6px 20px rgba(30, 64, 175, 0.3)',
-              marginBottom: '24px'
-            }}>
-              Your Score: {score}/30
-            </div>
-          </div>
-
-          {(() => {
-            const recommendations = getDetailedRecommendations(score);
-            return (
-              <div>
-                <div style={{
-                  background: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  marginBottom: '24px',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
-                }}>
-                  <h3 style={{ 
-                    color: '#1e40af', 
-                    fontSize: '22px', 
-                    fontWeight: '600',
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    📊 Your Assessment Level: {recommendations.title}
-                  </h3>
-                  <p style={{ 
-                    fontSize: '16px', 
-                    lineHeight: '1.6', 
-                    color: '#475569',
-                    marginBottom: '0'
-                  }}>
-                    {recommendations.description}
-                  </p>
-                </div>
-
-                <div style={{
-                  background: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  marginBottom: '24px',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
-                }}>
-                  <h4 style={{ 
-                    color: '#1e40af', 
-                    fontSize: '18px', 
-                    fontWeight: '600',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    💡 Personalized Recommendations
-                  </h4>
-                  <ul style={{ 
-                    listStyle: 'none', 
-                    padding: '0',
-                    margin: '0'
-                  }}>
-                    {recommendations.recommendations.map((rec, index) => (
-                      <li key={index} style={{
-                        padding: '8px 0',
-                        borderBottom: index < recommendations.recommendations.length - 1 ? '1px solid #e2e8f0' : 'none',
-                        display: 'flex',
-                        alignItems: 'flex-start'
-                      }}>
-                        <span style={{ 
-                          color: '#10b981', 
-                          marginRight: '12px',
-                          fontSize: '16px',
-                          marginTop: '2px'
-                        }}>
-                          ✓
-                        </span>
-                        <span style={{ 
-                          fontSize: '15px', 
-                          lineHeight: '1.5',
-                          color: '#475569'
-                        }}>
-                          {rec}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{
-                  background: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
-                }}>
-                  <h4 style={{ 
-                    color: '#1e40af', 
-                    fontSize: '18px', 
-                    fontWeight: '600',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    🚀 Next Steps
-                  </h4>
-                  <ol style={{ 
-                    padding: '0 0 0 20px',
-                    margin: '0'
-                  }}>
-                    {recommendations.nextSteps.map((step, index) => (
-                      <li key={index} style={{
-                        padding: '8px 0',
-                        fontSize: '15px',
-                        lineHeight: '1.5',
-                        color: '#475569'
-                      }}>
-                        {step}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-
-                <div style={{
-                  textAlign: 'center',
-                  marginTop: '32px',
-                  padding: '20px',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(59, 130, 246, 0.2)'
-                }}>
-                  <h4 style={{ 
-                    color: '#1e40af', 
-                    fontSize: '18px', 
-                    fontWeight: '600',
-                    marginBottom: '12px'
-                  }}>
-                    Ready to Begin Your Governance Journey?
-                  </h4>
-                  <p style={{ 
-                    fontSize: '15px', 
-                    color: '#475569',
-                    marginBottom: '20px',
-                    lineHeight: '1.5'
-                  }}>
-                    Your personalized learning path has been created based on your assessment results.
-                    Start exploring the governance modules that match your current level and interests.
-                  </p>
-                  <button
-                    onClick={() => {
-                      // Navigate to appropriate module or dashboard
-                      window.location.href = '/modules';
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px 24px',
-                      borderRadius: '8px',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                      marginRight: '12px'
-                    }}
-                  >
-                    Start Learning
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowResults(false);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    style={{
-                      background: 'transparent',
-                      color: '#3b82f6',
-                      border: '2px solid #3b82f6',
-                      padding: '10px 24px',
-                      borderRadius: '8px',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Retake Assessment
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
     </DocumentLayout>
   );
 };

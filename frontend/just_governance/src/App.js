@@ -29,12 +29,12 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          {/* 文档页始终可访问 */}
+          {/* Documentation page is always accessible */}
           <Route path="/terms" element={<TermsAndConditions />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          {/* 登录页：已登录则跳转首页 */}
+          {/* Login page: redirect to home if already logged in */}
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />} />
-          {/* 主页和其他页面需登录 */}
+          {/* Home and other pages require login */}
           <Route path="/" element={user ? <Home user={user} onSignOut={handleLogout} /> : <Navigate to="/login" replace />} />
           <Route path="/welcome" element={user ? <IntroductoryQuestions /> : <Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

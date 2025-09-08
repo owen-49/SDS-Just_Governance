@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import Modal from '../components/Modal';
@@ -6,207 +8,6 @@ import AssessmentModal from '../components/AssessmentModal';
 import { dbApi } from '../lib/localDb';
 import { findTopicById } from '../data/structure';
 import { aiAsk } from '../lib/api';
-
-// 统一的 Markdown 格式化组件
-const FormattedMessage = ({ text, role }) => {
-  if (!text) return '';
-  
-  // 处理行内 Markdown 格式的辅助函数
-  const formatInlineMarkdown = (text) => {
-    if (!text) return '';
-    
-    // 处理行内代码
-    const parts = text.split(/(`[^`]+`)/);
-    return parts.map((part, index) => {
-      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-        return (
-          <code key={index} style={{
-            background: role === 'user' ? 'rgba(255,255,255,0.2)' : 'rgba(107, 114, 128, 0.1)',
-            color: role === 'user' ? 'rgba(255,255,255,0.9)' : '#dc2626',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            fontFamily: '"Fira Code", "Monaco", monospace',
-            fontSize: '0.9em'
-          }}>
-            {part.slice(1, -1)}
-          </code>
-        );
-      } else {
-        // 处理加粗文本 **text**
-        const boldParts = part.split(/(\*\*[^*]+\*\*)/);
-        return boldParts.map((boldPart, boldIndex) => {
-          if (boldPart.startsWith('**') && boldPart.endsWith('**') && boldPart.length > 4) {
-            return <strong key={`${index}-${boldIndex}`}>{boldPart.slice(2, -2)}</strong>;
-          } else {
-            // 处理斜体文本 *text*
-            const italicParts = boldPart.split(/(\*[^*]+\*)/);
-            return italicParts.map((italicPart, italicIndex) => {
-              if (italicPart.startsWith('*') && italicPart.endsWith('*') && italicPart.length > 2 && !italicPart.includes('**')) {
-                return <em key={`${index}-${boldIndex}-${italicIndex}`}>{italicPart.slice(1, -1)}</em>;
-              } else {
-                return italicPart;
-              }
-            });
-          }
-        });
-      }
-    });
-  };
-  
-  // 先处理代码块（多行）
-  const codeBlockParts = text.split(/(```[\s\S]*?```)/);
-  
-  return (
-    <div style={{ fontSize: '16px', lineHeight: '1.7' }}>
-      {codeBlockParts.map((part, index) => {
-        if (part.startsWith('```') && part.endsWith('```') && part.length > 6) {
-          const code = part.slice(3, -3).trim();
-          const lines = code.split('\n');
-          const language = lines[0] && !lines[0].includes(' ') ? lines[0] : '';
-          const codeContent = language ? lines.slice(1).join('\n') : code;
-          
-          return (
-            <pre key={index} style={{
-              background: role === 'user' ? 'rgba(255,255,255,0.15)' : '#1f2937',
-              color: role === 'user' ? 'rgba(255,255,255,0.95)' : '#e5e7eb',
-              padding: '16px',
-              borderRadius: '8px',
-              margin: '12px 0',
-              overflow: 'auto',
-              fontFamily: '"Fira Code", "Monaco", monospace',
-              fontSize: '0.9em',
-              lineHeight: '1.4',
-              position: 'relative'
-            }}>
-              {language && (
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '12px',
-                  fontSize: '11px',
-                  color: role === 'user' ? 'rgba(255,255,255,0.7)' : '#9ca3af',
-                  textTransform: 'uppercase',
-                  fontWeight: 500
-                }}>
-                  {language}
-                </div>
-              )}
-              <code>{codeContent}</code>
-            </pre>
-          );
-        }
-        
-        // 处理段落和其他元素
-        const lines = part.split('\n');
-        return lines.map((line, lineIndex) => {
-          // 处理标题
-          if (line.startsWith('### ')) {
-            return (
-              <h3 key={`${index}-${lineIndex}`} style={{
-                fontSize: '1.25em',
-                fontWeight: 'bold',
-                margin: '16px 0 8px 0',
-                color: role === 'user' ? 'inherit' : '#1f2937'
-              }}>
-                {formatInlineMarkdown(line.slice(4))}
-              </h3>
-            );
-          }
-          if (line.startsWith('## ')) {
-            return (
-              <h2 key={`${index}-${lineIndex}`} style={{
-                fontSize: '1.5em',
-                fontWeight: 'bold',
-                margin: '20px 0 10px 0',
-                color: role === 'user' ? 'inherit' : '#1f2937'
-              }}>
-                {formatInlineMarkdown(line.slice(3))}
-              </h2>
-            );
-          }
-          if (line.startsWith('# ')) {
-            return (
-              <h1 key={`${index}-${lineIndex}`} style={{
-                fontSize: '1.75em',
-                fontWeight: 'bold',
-                margin: '24px 0 12px 0',
-                color: role === 'user' ? 'inherit' : '#1f2937'
-              }}>
-                {formatInlineMarkdown(line.slice(2))}
-              </h1>
-            );
-          }
-          
-          // 处理引用
-          if (line.startsWith('> ')) {
-            return (
-              <blockquote key={`${index}-${lineIndex}`} style={{
-                borderLeft: role === 'user' ? '4px solid rgba(255,255,255,0.5)' : '4px solid #3b82f6',
-                background: role === 'user' ? 'rgba(255,255,255,0.1)' : 'rgba(59, 130, 246, 0.05)',
-                padding: '12px 16px',
-                margin: '12px 0',
-                fontStyle: 'italic',
-                color: 'inherit'
-              }}>
-                {formatInlineMarkdown(line.slice(2))}
-              </blockquote>
-            );
-          }
-          
-          // 处理列表项
-          if (line.match(/^[\s]*[-*+]\s/)) {
-            return (
-              <div key={`${index}-${lineIndex}`} style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                margin: '4px 0',
-                paddingLeft: '16px'
-              }}>
-                <span style={{ 
-                  marginRight: '8px', 
-                  color: role === 'user' ? 'rgba(255,255,255,0.8)' : '#3b82f6'
-                }}>•</span>
-                <span>{formatInlineMarkdown(line.replace(/^[\s]*[-*+]\s/, ''))}</span>
-              </div>
-            );
-          }
-          
-          // 处理有序列表
-          if (line.match(/^[\s]*\d+\.\s/)) {
-            const number = line.match(/^[\s]*(\d+)\./)[1];
-            return (
-              <div key={`${index}-${lineIndex}`} style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                margin: '4px 0',
-                paddingLeft: '16px'
-              }}>
-                <span style={{ 
-                  marginRight: '8px', 
-                  color: role === 'user' ? 'rgba(255,255,255,0.8)' : '#3b82f6',
-                  fontWeight: 'bold' 
-                }}>{number}.</span>
-                <span>{formatInlineMarkdown(line.replace(/^[\s]*\d+\.\s/, ''))}</span>
-              </div>
-            );
-          }
-          
-          // 空行处理
-          if (line.trim() === '') {
-            return <br key={`${index}-${lineIndex}`} />;
-          }
-          
-          // 普通段落
-          return (
-            <p key={`${index}-${lineIndex}`} style={{ margin: '8px 0', lineHeight: '1.6' }}>
-              {formatInlineMarkdown(line)}
-            </p>
-          );
-        });
-      })}
-    </div>
-  );
-};
 
 function GlobalChat({ email }) {
   const [list, setList] = useState(() => dbApi.globalConvs(email));
@@ -216,35 +17,34 @@ function GlobalChat({ email }) {
 
   useEffect(() => { dbApi.saveGlobalConvs(email, list); }, [email, list]);
 
-  // 迁移历史对话标题（一次性）
+  // Migrate historical conversation titles (one-time operation)
   useEffect(() => {
     const needsMigration = list.some(conv => 
-      conv.title.includes('对话 #') || 
-      (conv.title === 'New Conversation' && !conv.title.includes('#'))
+      conv.title.includes('Conversation #') || 
+      conv.title.includes('#') ||
+      (conv.title === 'New Conversation' && !conv.title.includes('💬'))
     );
     if (needsMigration) {
-      const migratedList = list.map((conv, index) => {
-        if (conv.title.includes('对话 #') || (conv.title === 'New Conversation' && !conv.title.includes('#'))) {
-          // 使用对话的创建时间或第一条消息时间
-          const timestamp = conv.messages.length > 0 ? conv.messages[0].ts : conv.updatedAt;
-          const date = new Date(timestamp || Date.now());
-          const timeString = date.toLocaleString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-          });
-          
+      const migratedList = list.map((conv) => {
+        if (conv.title.includes('Conversation #') || conv.title.includes('#') || (conv.title === 'New Conversation' && !conv.title.includes('💬'))) {
           const firstUserMessage = conv.messages.find(m => m.role === 'user');
-          const number = list.length - index;
           
           if (firstUserMessage) {
             const cleanMessage = firstUserMessage.text.trim().replace(/\n/g, ' ');
-            const messageTitle = cleanMessage.length <= 30 ? cleanMessage : cleanMessage.substring(0, 27) + '...';
-            return { ...conv, title: `#${number} ${messageTitle} - ${timeString}` };
+            const messageTitle = cleanMessage.length <= 40 ? cleanMessage : cleanMessage.substring(0, 37) + '...';
+            return { ...conv, title: `💭 ${messageTitle}` };
           } else {
-            return { ...conv, title: `#${number} New Conversation - ${timeString}` };
+            // Use conversation creation time
+            const timestamp = conv.updatedAt || Date.now();
+            const date = new Date(timestamp);
+            const timeString = date.toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            });
+            return { ...conv, title: `💬 New Conversation · ${timeString}` };
           }
         }
         return conv;
@@ -253,61 +53,42 @@ function GlobalChat({ email }) {
     }
   }, [list, setList]);
 
-  // 根据消息内容生成标题的辅助函数
+  // Helper function to generate title based on message content
   const generateTitleFromMessage = (message) => {
     const now = new Date();
     const timeString = now.toLocaleString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
+      month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
     
-    // 计算下一个对话编号
-    const existingNumbers = list
-      .map(conv => {
-        const match = conv.title.match(/#(\d+)/);
-        return match ? parseInt(match[1]) : 0;
-      })
-      .filter(num => num > 0);
-    
-    const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
-    
     if (!message || message.trim().length === 0) {
-      return `#${nextNumber} New Conversation - ${timeString}`;
+      return `💬 New Conversation · ${timeString}`;
     }
     
-    // 截取前30个字符作为标题内容
+    // Extract first 40 characters as title content
     const cleanMessage = message.trim().replace(/\n/g, ' ');
-    const messageTitle = cleanMessage.length <= 30 ? cleanMessage : cleanMessage.substring(0, 27) + '...';
+    const messageTitle = cleanMessage.length <= 40 ? cleanMessage : cleanMessage.substring(0, 37) + '...';
     
-    return `#${nextNumber} ${messageTitle} - ${timeString}`;
+    return `💭 ${messageTitle}`;
   };
 
   const newConv = () => {
     const id = Math.random().toString(36).slice(2);
     
-    // 生成带编号和时间的默认标题
+    // Generate beautiful default title
     const now = new Date();
     const timeString = now.toLocaleString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
+      month: 'short',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
     
-    // 计算下一个对话编号
-    const existingNumbers = list
-      .map(conv => {
-        const match = conv.title.match(/#(\d+)/);
-        return match ? parseInt(match[1]) : 0;
-      })
-      .filter(num => num > 0);
-    
-    const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
-    const title = `#${nextNumber} New Conversation - ${timeString}`;
+    const title = `💬 New Conversation · ${timeString}`;
     
     const c = { id, title, messages: [], updatedAt: Date.now() };
     setList(prev => [c, ...prev]);
@@ -319,11 +100,11 @@ function GlobalChat({ email }) {
     const text = input.trim();
     if (!text) return;
     
-    // 检查是否是第一条消息，如果是则更新标题
+    // Check if this is the first message, update title if so
     const isFirstMessage = current.messages.length === 0;
     const newTitle = isFirstMessage ? generateTitleFromMessage(text) : current.title;
     
-    // 先添加用户消息，如果是第一条消息同时更新标题
+    // First add user message, update title if it's the first message
     setList(prev => prev.map(c => c.id === current.id ? {
       ...c,
       title: newTitle,
@@ -333,11 +114,11 @@ function GlobalChat({ email }) {
     setInput('');
     
     try {
-      // 调用后端API获取AI回复
+      // Call backend API to get AI response
       const response = await aiAsk(text, 'beginner');
       const aiReply = response.answer || 'Sorry, I could not process your question.';
       
-      // 添加AI回复
+      // Add AI response
       setList(prev => prev.map(c => c.id === current.id ? {
         ...c,
         messages: [...c.messages, { role: 'ai', text: aiReply, ts: Date.now() }],
@@ -345,7 +126,7 @@ function GlobalChat({ email }) {
       } : c));
     } catch (error) {
       console.error('AI API call failed:', error);
-      // 添加错误提示
+      // Add error message
       setList(prev => prev.map(c => c.id === current.id ? {
         ...c,
         messages: [...c.messages, { role: 'ai', text: 'Sorry, I encountered an error while processing your question. Please try again.', ts: Date.now() }],
@@ -368,21 +149,34 @@ function GlobalChat({ email }) {
         gap: 12, 
         alignItems: 'center',
         background: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)'
+        backdropFilter: 'blur(10px)',
+        position: 'relative',
+        zIndex: 200
       }}>
         <select 
           value={currentId || ''} 
           onChange={(e) => setCurrentId(e.target.value)}
           style={{
-            padding: '8px 12px',
+            padding: '10px 16px',
             border: '1px solid rgba(226, 232, 240, 0.8)',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(10px)',
-            fontSize: '14px',
+            borderRadius: '12px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(15px)',
+            fontSize: '15px',
             color: '#374151',
             cursor: 'pointer',
-            minWidth: '200px'
+            minWidth: '280px',
+            fontWeight: 500,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+            transition: 'all 0.2s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#22c55e';
+            e.target.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+            e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
           }}
         >
           {list.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
@@ -390,53 +184,59 @@ function GlobalChat({ email }) {
         <button 
           onClick={newConv}
           style={{
-            padding: '8px 16px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            padding: '10px 20px',
+            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
             color: 'white',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '12px',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '15px',
             fontWeight: 600,
             transition: 'all 0.2s ease',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
           onMouseOver={(e) => {
             e.target.style.transform = 'translateY(-1px)';
-            e.target.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+            e.target.style.boxShadow = '0 6px 16px rgba(34, 197, 94, 0.4)';
           }}
           onMouseOut={(e) => {
             e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+            e.target.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.3)';
           }}
         >
-          ➕ New Conversation
+          <span>💬</span> New Conversation
         </button>
         {current && (
-          <details style={{ position: 'relative' }}>
+          <details style={{ position: 'relative', display: 'inline-block', zIndex: 1000 }}>
             <summary style={{
               listStyle: 'none',
               cursor: 'pointer',
               padding: '8px 12px',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: 'rgba(0, 0, 0, 0.9)',
               backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
               borderRadius: '8px',
               fontSize: '14px',
-              color: '#6b7280'
+              color: '#ffffff'
             }}>
               ⋯ More
             </summary>
             <div style={{ 
               position: 'absolute', 
-              background: 'rgba(255, 255, 255, 0.95)',
+              background: 'rgba(0, 0, 0, 0.95)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(226, 232, 240, 0.8)', 
+              border: '1px solid rgba(34, 197, 94, 0.3)', 
               padding: '8px', 
               borderRadius: '8px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-              zIndex: 10,
-              minWidth: '150px'
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+              zIndex: 1001,
+              minWidth: '150px',
+              right: 0,
+              top: '100%',
+              marginTop: '4px'
             }}>
               <button 
                 onClick={() => {
@@ -451,11 +251,11 @@ function GlobalChat({ email }) {
                   background: 'transparent',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  color: '#374151',
+                  color: '#ffffff',
                   borderRadius: '4px',
                   transition: 'background 0.2s ease'
                 }}
-                onMouseOver={(e) => e.target.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOver={(e) => e.target.style.background = 'rgba(34, 197, 94, 0.2)'}
                 onMouseOut={(e) => e.target.style.background = 'transparent'}
               >
                 ✏️ Rename
@@ -488,10 +288,14 @@ function GlobalChat({ email }) {
           </details>
         )}
       </div>
-      <div style={{ 
+      <div className="scroll-container" style={{ 
         padding: '20px', 
         overflow: 'auto',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        scrollBehavior: 'smooth',
+        height: '100%',
+        position: 'relative',
+        zIndex: 1
       }}>
         {!current && (
           <div style={{ 
@@ -516,13 +320,13 @@ function GlobalChat({ email }) {
               No conversations yet
             </h3>
             <p style={{ margin: '0 0 24px 0', fontSize: '16px' }}>
-              Start a new conversation to begin your governance journey
+              Start a new conversation to explore governance knowledge
             </p>
             <button 
               onClick={newConv}
               style={{
                 padding: '12px 24px',
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
@@ -530,15 +334,18 @@ function GlobalChat({ email }) {
                 fontSize: '16px',
                 fontWeight: 600,
                 transition: 'all 0.3s ease',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
               }}
               onMouseOver={(e) => {
                 e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
+                e.target.style.boxShadow = '0 8px 20px rgba(34, 197, 94, 0.4)';
               }}
               onMouseOut={(e) => {
                 e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                e.target.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.3)';
               }}
             >
               🚀 Start New Conversation
@@ -546,53 +353,134 @@ function GlobalChat({ email }) {
           </div>
         )}
         {current && (
-          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <div style={{ 
+            maxWidth: '900px', 
+            margin: '0 auto', 
+            padding: '0 20px',
+            paddingBottom: '20px'
+          }}>
             {current.messages.map((m, i) => (
-              <div key={i} style={{ 
+              <div key={i} className="chat-message" style={{ 
                 display: 'flex', 
-                justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', 
-                margin: '16px 0',
+                justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
+                margin: '24px 0',
                 animation: 'messageSlideIn 0.3s ease-out'
               }}>
+                {/* Message Content */}
                 <div style={{ 
-                  background: m.role === 'user' 
-                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
-                    : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                  color: m.role === 'user' ? '#fff' : '#111827', 
-                  padding: '16px 20px', 
-                  borderRadius: m.role === 'user' ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
-                  maxWidth: '80%',
-                  boxShadow: m.role === 'user' 
-                    ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
-                    : '0 2px 8px rgba(0, 0, 0, 0.08)',
-                  border: m.role === 'user' ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
-                  position: 'relative'
+                  maxWidth: '75%',
+                  minWidth: 0
                 }}>
-                  {m.role === 'ai' && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      left: '12px',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '8px solid transparent',
-                      borderRight: '8px solid transparent',
-                      borderBottom: '8px solid rgba(255, 255, 255, 0.9)'
-                    }}></div>
-                  )}
-                  {m.role === 'user' && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      right: '12px',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '8px solid transparent',
-                      borderRight: '8px solid transparent',
-                      borderBottom: '8px solid #1d4ed8'
-                    }}></div>
-                  )}
-                  <FormattedMessage text={m.text} role={m.role} />
+                  {/* Header with role and timestamp */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '8px',
+                    justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start'
+                  }}>
+                    <span style={{
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      color: '#374151'
+                    }}>
+                      {m.role === 'user' ? 'You' : 'AI Assistant'}
+                    </span>
+                    <span style={{
+                      fontSize: '12px',
+                      color: '#9ca3af'
+                    }}>
+                      {new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  
+                  {/* Message bubble */}
+                  <div style={{ 
+                    background: m.role === 'user' 
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                      : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    color: m.role === 'user' ? 'white' : '#111827',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    position: 'relative',
+                    boxShadow: m.role === 'user' 
+                      ? '0 4px 12px rgba(37, 99, 235, 0.3)' 
+                      : '0 2px 8px rgba(0, 0, 0, 0.08)',
+                    border: m.role === 'user' ? 'none' : '1px solid #e2e8f0'
+                  }}>
+                    
+                    <div className="markdown-content" style={{
+                      fontSize: '15px',
+                      lineHeight: '1.6',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                    }}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({children}) => <p style={{margin: '0 0 12px 0'}}>{children}</p>,
+                          h1: ({children}) => <h1 style={{fontSize: '20px', fontWeight: '700', margin: '0 0 12px 0'}}>{children}</h1>,
+                          h2: ({children}) => <h2 style={{fontSize: '18px', fontWeight: '600', margin: '16px 0 8px 0'}}>{children}</h2>,
+                          h3: ({children}) => <h3 style={{fontSize: '16px', fontWeight: '600', margin: '12px 0 6px 0'}}>{children}</h3>,
+                          ul: ({children}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}}>{children}</ul>,
+                          ol: ({children}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}}>{children}</ol>,
+                          li: ({children}) => <li style={{margin: '4px 0'}}>{children}</li>,
+                          code: ({children}) => <code style={{
+                            background: m.role === 'user' ? 'rgba(255, 255, 255, 0.2)' : '#f1f5f9',
+                            padding: '3px 6px',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas, monospace',
+                            color: m.role === 'user' ? 'rgba(255, 255, 255, 0.9)' : '#1f2937',
+                            border: m.role === 'user' ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid #e2e8f0'
+                          }}>{children}</code>,
+                          pre: ({children}) => <pre style={{
+                            background: '#1f2937',
+                            color: '#f9fafb',
+                            padding: '16px',
+                            borderRadius: '8px',
+                            margin: '12px 0',
+                            overflow: 'auto',
+                            fontSize: '14px',
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas, monospace',
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}>{children}</pre>,
+                          blockquote: ({children}) => <blockquote style={{
+                            borderLeft: m.role === 'user' ? '4px solid rgba(255, 255, 255, 0.5)' : '4px solid #3b82f6',
+                            paddingLeft: '16px',
+                            margin: '12px 0',
+                            fontStyle: 'italic',
+                            color: m.role === 'user' ? 'rgba(255, 255, 255, 0.9)' : '#6b7280',
+                            background: m.role === 'user' ? 'rgba(255, 255, 255, 0.1)' : '#f8fafc',
+                            padding: '12px 16px',
+                            borderRadius: '0 8px 8px 0'
+                          }}>{children}</blockquote>,
+                          table: ({children}) => <table style={{
+                            borderCollapse: 'collapse',
+                            width: '100%',
+                            margin: '16px 0',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                            borderRadius: '8px',
+                            overflow: 'hidden'
+                          }}>{children}</table>,
+                          th: ({children}) => <th style={{
+                            background: m.role === 'user' ? 'rgba(255, 255, 255, 0.2)' : '#f8fafc',
+                            padding: '12px',
+                            textAlign: 'left',
+                            fontWeight: '600',
+                            color: m.role === 'user' ? 'white' : '#374151',
+                            borderBottom: '2px solid #e2e8f0'
+                          }}>{children}</th>,
+                          td: ({children}) => <td style={{
+                            padding: '12px',
+                            borderBottom: '1px solid #e2e8f0',
+                            color: m.role === 'user' ? 'rgba(255, 255, 255, 0.9)' : '#111827'
+                          }}>{children}</td>
+                        }}
+                      >
+                        {m.text}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -605,18 +493,21 @@ function GlobalChat({ email }) {
         display: 'flex', 
         gap: 12,
         background: 'rgba(255, 255, 255, 0.9)',
-        backdropFilter: 'blur(10px)'
+        backdropFilter: 'blur(10px)',
+        position: 'relative',
+        zIndex: 100
       }}>
         <textarea 
-          rows={2} 
+          rows={4} 
           style={{ 
             flex: 1,
-            padding: '12px 16px',
+            padding: '16px 20px',
             border: '1px solid rgba(226, 232, 240, 0.8)',
             borderRadius: '12px',
             background: 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(10px)',
             fontSize: '15px',
+            lineHeight: '1.5',
             resize: 'none',
             outline: 'none',
             transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
@@ -624,6 +515,12 @@ function GlobalChat({ email }) {
           value={input} 
           onChange={(e) => setInput(e.target.value)} 
           placeholder="Ask anything about governance..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
           onFocus={(e) => {
             e.target.style.borderColor = '#2563eb';
             e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)';
@@ -670,7 +567,7 @@ function GlobalChat({ email }) {
   );
 }
 
-function TopicPage({ topicId, email }) {
+function TopicPage({ topicId, email, onBack }) {
   const found = findTopicById(topicId);
   const { section, module, topic } = found || {};
   const [tab, setTab] = useState('content'); // content | conversation | scenario
@@ -680,9 +577,23 @@ function TopicPage({ topicId, email }) {
   useEffect(() => { dbApi.saveTopicChat(email, topicId, chat); }, [email, topicId, chat]);
   useEffect(() => { dbApi.saveTopicProgress(email, topicId, progress); }, [email, topicId, progress]);
 
-  const send = (text) => {
-    const aiReply = `Good point on ${topic.name}. Here's more to consider...`;
-    setChat(c => ({ ...c, messages: [...c.messages, { role: 'user', text, ts: Date.now() }, { role: 'ai', text: aiReply, ts: Date.now() }], updatedAt: Date.now() }));
+  const send = async (text) => {
+    // Add user message first
+    setChat(c => ({ ...c, messages: [...c.messages, { role: 'user', text, ts: Date.now() }], updatedAt: Date.now() }));
+    
+    try {
+      // Call backend AI API with topic context
+      const contextualPrompt = `In the context of the topic "${topic.name}", please answer: ${text}`;
+      const response = await aiAsk(contextualPrompt, 'beginner');
+      const aiReply = response.answer || 'Sorry, I could not process your question.';
+      
+      // Add AI response
+      setChat(c => ({ ...c, messages: [...c.messages, { role: 'ai', text: aiReply, ts: Date.now() }], updatedAt: Date.now() }));
+    } catch (error) {
+      console.error('AI API call failed:', error);
+      // Add error message
+      setChat(c => ({ ...c, messages: [...c.messages, { role: 'ai', text: 'Sorry, I encountered an error while processing your question. Please try again.', ts: Date.now() }], updatedAt: Date.now() }));
+    }
   };
 
   const QuizCard = () => {
@@ -757,10 +668,37 @@ function TopicPage({ topicId, email }) {
   };
 
   return (
-    <div style={{ height: 'calc(100vh - 56px)', overflow: 'auto' }}>
-      <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1, borderBottom: '1px solid #eee' }}>
-        <div style={{ padding: 12, color: '#334155' }}>
-          {section?.name} / {module?.name} / {topic?.name}
+    <div className="scroll-container" style={{ 
+      height: 'calc(100vh - 56px)', 
+      overflow: 'auto',
+      position: 'relative'
+    }}>
+      <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 300, borderBottom: '1px solid #eee', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}>
+        <div style={{ padding: 12, color: '#334155', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onBack && (
+            <button 
+              onClick={onBack}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#3b82f6',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#eff6ff'}
+              onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+              title="Back to Home"
+            >
+              ← Back
+            </button>
+          )}
+          <span>{section?.name} / {module?.name} / {topic?.name}</span>
         </div>
         <div style={{ padding: '0 12px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <h2 style={{ margin: '6px 0' }}>{topic?.name}</h2>
@@ -803,31 +741,133 @@ function TopicPage({ topicId, email }) {
         </div>
       )}
       {tab === 'conversation' && (
-        <div style={{ display: 'grid', gridTemplateRows: '1fr auto', height: 'calc(100% - 110px)' }}>
-          <div style={{ padding: 16, overflow: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateRows: '1fr auto', height: 'calc(100% - 120px)', minHeight: '400px' }}>
+          <div className="scroll-container" style={{ 
+            padding: '16px 20px', 
+            overflow: 'auto',
+            scrollBehavior: 'smooth',
+            maxHeight: '100%',
+            position: 'relative',
+            zIndex: 1
+          }}>
             {chat.messages.length === 0 && (
-              <div style={{ color: '#64748b' }}>Try: "Explain the main risks in this topic"</div>
+              <div style={{ 
+                color: '#64748b', 
+                textAlign: 'center', 
+                padding: '40px 20px',
+                fontSize: '15px',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0'
+              }}>
+                💡 Try: "Explain the main risks in this topic"
+              </div>
             )}
             {chat.messages.map((m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', margin: '12px 0' }}>
+              <div key={i} className="chat-message" style={{ 
+                display: 'flex', 
+                justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
+                margin: '20px 0'
+              }}>
+                {/* Message Content */}
                 <div style={{ 
-                  background: m.role === 'user' 
-                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
-                    : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', 
-                  color: m.role === 'user' ? '#fff' : '#111827', 
-                  padding: '12px 16px', 
-                  borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', 
-                  maxWidth: '85%',
-                  boxShadow: m.role === 'user' 
-                    ? '0 3px 8px rgba(37, 99, 235, 0.25)' 
-                    : '0 2px 6px rgba(0, 0, 0, 0.06)'
+                  maxWidth: '80%',
+                  minWidth: 0
                 }}>
-                  <FormattedMessage text={m.text} role={m.role} />
+                  {/* Header with role and timestamp */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '6px',
+                    justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start'
+                  }}>
+                    <span style={{
+                      fontWeight: '600',
+                      fontSize: '13px',
+                      color: '#374151'
+                    }}>
+                      {m.role === 'user' ? 'You' : 'AI Assistant'}
+                    </span>
+                    <span style={{
+                      fontSize: '11px',
+                      color: '#9ca3af'
+                    }}>
+                      {new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  
+                  {/* Message bubble */}
+                  <div style={{ 
+                    background: m.role === 'user' 
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                      : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    color: m.role === 'user' ? 'white' : '#111827',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    position: 'relative',
+                    boxShadow: m.role === 'user' 
+                      ? '0 3px 8px rgba(37, 99, 235, 0.25)' 
+                      : '0 2px 6px rgba(0, 0, 0, 0.06)',
+                    border: m.role === 'user' ? 'none' : '1px solid #e2e8f0'
+                  }}>
+                    
+                    <div className="markdown-content" style={{
+                      fontSize: '14px',
+                      lineHeight: '1.6',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                    }}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({children}) => <p style={{margin: '0 0 8px 0'}}>{children}</p>,
+                          h1: ({children}) => <h1 style={{fontSize: '18px', fontWeight: '700', margin: '0 0 8px 0'}}>{children}</h1>,
+                          h2: ({children}) => <h2 style={{fontSize: '16px', fontWeight: '600', margin: '12px 0 6px 0'}}>{children}</h2>,
+                          h3: ({children}) => <h3 style={{fontSize: '15px', fontWeight: '600', margin: '10px 0 4px 0'}}>{children}</h3>,
+                          ul: ({children}) => <ul style={{margin: '6px 0', paddingLeft: '18px'}}>{children}</ul>,
+                          ol: ({children}) => <ol style={{margin: '6px 0', paddingLeft: '18px'}}>{children}</ol>,
+                          li: ({children}) => <li style={{margin: '2px 0'}}>{children}</li>,
+                          code: ({children}) => <code style={{
+                            background: m.role === 'user' ? 'rgba(255, 255, 255, 0.2)' : '#f1f5f9',
+                            padding: '2px 4px',
+                            borderRadius: '3px',
+                            fontSize: '13px',
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas, monospace',
+                            color: m.role === 'user' ? 'rgba(255, 255, 255, 0.9)' : '#1f2937',
+                            border: m.role === 'user' ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid #e2e8f0'
+                          }}>{children}</code>,
+                          pre: ({children}) => <pre style={{
+                            background: '#1f2937',
+                            color: '#f9fafb',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            margin: '8px 0',
+                            overflow: 'auto',
+                            fontSize: '13px',
+                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas, monospace',
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                          }}>{children}</pre>
+                        }}
+                      >
+                        {m.text}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-          <div style={{ padding: 12, borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
+          <div style={{ 
+            padding: 12, 
+            borderTop: '1px solid #eee', 
+            display: 'flex', 
+            gap: 8,
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 50
+          }}>
             <TopicInput onSend={send} />
           </div>
         </div>
@@ -841,10 +881,62 @@ function TopicPage({ topicId, email }) {
 
 function TopicInput({ onSend }) {
   const [text, setText] = useState('');
+  
+  const handleSend = () => {
+    if (text.trim()) { 
+      onSend(text.trim()); 
+      setText(''); 
+    }
+  };
+  
   return (
     <>
-      <textarea rows={2} style={{ flex: 1 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask within this topic..." />
-      <button onClick={() => { if (text.trim()) { onSend(text.trim()); setText(''); } }}>Send</button>
+      <textarea 
+        rows={3} 
+        style={{ 
+          flex: 1,
+          padding: '12px 16px',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          resize: 'none',
+          outline: 'none',
+          transition: 'border-color 0.2s ease'
+        }} 
+        value={text} 
+        onChange={(e) => setText(e.target.value)} 
+        placeholder="Ask within this topic..."
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+          }
+        }}
+        onFocus={(e) => {
+          e.target.style.borderColor = '#2563eb';
+        }}
+        onBlur={(e) => {
+          e.target.style.borderColor = '#e5e7eb';
+        }}
+      />
+      <button 
+        onClick={handleSend}
+        style={{
+          padding: '12px 20px',
+          background: text.trim() ? '#2563eb' : '#e5e7eb',
+          color: text.trim() ? 'white' : '#9ca3af',
+          border: 'none',
+          borderRadius: '8px',
+          cursor: text.trim() ? 'pointer' : 'not-allowed',
+          fontSize: '14px',
+          fontWeight: 600,
+          transition: 'all 0.2s ease'
+        }}
+        disabled={!text.trim()}
+      >
+        Send
+      </button>
     </>
   );
 }
@@ -852,12 +944,34 @@ function TopicInput({ onSend }) {
 function ScenarioSim({ topic }) {
   const [history, setHistory] = useState([]);
   const [input, setInput] = useState('');
-  const submit = () => {
+  
+  const submit = async () => {
     if (!input.trim()) return;
-    const cont = `In the scenario of ${topic.name}, someone challenges your point. Consider acknowledging and reframing...`;
-    setHistory(h => [...h, { you: input }, { ai: cont }]);
+    
+    // Add user input to history first
+    setHistory(h => [...h, { you: input }]);
+    
+    try {
+      // Call AI API for scenario-based response
+      const scenarioPrompt = `In a governance scenario simulation for "${topic.name}", a participant says: "${input}". Please provide constructive feedback and specific suggestions for improvement in their communication and approach.`;
+      const response = await aiAsk(scenarioPrompt, 'beginner');
+      const aiReply = response.answer || 'Good response. Consider these general suggestions for improvement.';
+      
+      // Add AI response to history
+      setHistory(h => [...h, { ai: aiReply }]);
+    } catch (error) {
+      console.error('AI API call failed:', error);
+      // Add fallback response
+      const fallbackReply = `In the scenario of ${topic.name}, consider these suggestions:
+• Be concise and cite evidence
+• Invite collaboration from stakeholders  
+• Close with a clear next step`;
+      setHistory(h => [...h, { ai: fallbackReply }]);
+    }
+    
     setInput('');
   };
+  
   return (
     <div style={{ padding: 16 }}>
       <div style={{ color: '#334155', marginBottom: 12 }}>Scenario description: Practice in-situ responses and get improvement suggestions.</div>
@@ -869,19 +983,50 @@ function ScenarioSim({ topic }) {
             ) : (
               <div>
                 <strong>AI:</strong> {h.ai}
-                <ul>
-                  <li>Suggestion 1: Be concise and cite evidence</li>
-                  <li>Suggestion 2: Invite collaboration</li>
-                  <li>Suggestion 3: Close with a clear next step</li>
-                </ul>
               </div>
             )}
           </div>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <textarea rows={2} style={{ flex: 1 }} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Your speech/action" />
-        <button onClick={submit}>Run</button>
+        <textarea 
+          rows={3} 
+          style={{ 
+            flex: 1,
+            padding: '12px 16px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            resize: 'none',
+            outline: 'none'
+          }} 
+          value={input} 
+          onChange={(e) => setInput(e.target.value)} 
+          placeholder="Your speech/action"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
+        <button 
+          onClick={submit}
+          style={{
+            padding: '12px 20px',
+            background: input.trim() ? '#2563eb' : '#e5e7eb',
+            color: input.trim() ? 'white' : '#9ca3af',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: input.trim() ? 'pointer' : 'not-allowed',
+            fontSize: '14px',
+            fontWeight: 600
+          }}
+          disabled={!input.trim()}
+        >
+          Run
+        </button>
       </div>
       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
         <button onClick={() => setHistory([])}>Restart</button>
@@ -918,6 +1063,20 @@ export default function Home({ user, onSignOut }) {
   const onToggleModule = (id) => setNavUi(ui => ({ ...ui, expanded: { ...ui.expanded, [id]: !ui.expanded[id] } }));
 
   const onSelectTopic = (_s, _m, tp) => setTopicId(tp.id);
+  
+  const onBackToHome = () => setTopicId(null);
+
+  // Add keyboard shortcut for going back (Escape key)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && topicId) {
+        onBackToHome();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [topicId]);
 
   return (
     <div>
@@ -928,8 +1087,15 @@ export default function Home({ user, onSignOut }) {
         onOpenOverview={() => setShowOverview(true)}
         onProfile={() => alert('Profile placeholder')}
         onSignOut={onSignOut}
+        currentTopicId={topicId}
+        onBackToHome={onBackToHome}
       />
-      <div style={{ display: 'grid', gridTemplateColumns: `${navUi.collapsed ? 56 : 280}px 1fr` }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: `${navUi.collapsed ? 56 : 280}px 1fr`,
+        height: 'calc(100vh - 56px)',
+        overflow: 'hidden'
+      }}>
         <Sidebar
           ui={navUi}
           onToggleCollapsed={onToggleCollapsed}
@@ -939,11 +1105,15 @@ export default function Home({ user, onSignOut }) {
           currentTopicId={topicId}
           user={user}
         />
-        <main style={{ background: '#f8fafc' }}>
+        <main style={{ 
+          background: '#f8fafc',
+          overflow: 'hidden',
+          position: 'relative'
+        }}>
           {!topicId ? (
             <GlobalChat email={user.email} />
           ) : (
-            <TopicPage topicId={topicId} email={user.email} />
+            <TopicPage topicId={topicId} email={user.email} onBack={onBackToHome} />
           )}
         </main>
       </div>

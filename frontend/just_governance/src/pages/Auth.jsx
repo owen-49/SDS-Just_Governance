@@ -41,7 +41,7 @@ const LoginPage = ({ onLoginSuccess }) => {
       else if (res.code === 'wrong_password') setBanner('Incorrect password · Forgot Password?');
       else if (res.code === 'unverified') {
         setBanner('Please verify your email first');
-        // 发送验证邮件并进入验证页
+        // Send verification email and navigate to verification page
         const r = dbApi.createEmailVerificationToken(loginEmail);
         if (r.ok) {
           setVerify({ email: loginEmail, token: r.token });
@@ -65,7 +65,7 @@ const LoginPage = ({ onLoginSuccess }) => {
       setActiveTab('login');
       return;
     }
-    // 注册成功→发送验证邮件并跳到验证页
+    // Registration successful → send verification email and redirect to verification page
     const r = dbApi.createEmailVerificationToken(regEmail);
     if (r.ok) setVerify({ email: regEmail, token: r.token });
     setBanner('Verify your email · A verification link has been sent');
@@ -124,14 +124,14 @@ const LoginPage = ({ onLoginSuccess }) => {
             const provider_account_id = Math.random().toString(36).slice(2);
             const res = dbApi.oauthFindOrCreate(provider, provider_account_id, {});
             if (res.ok && res.isNew) {
-              // 首次授权：进入完善资料，不立刻登录跳转
+              // First authorization: complete profile, don't redirect immediately
               setOauthCtx({ provider, provider_account_id, email: res.user.email, user: res.user });
               setStage('oauth_profile');
               setBanner('Complete your profile to continue');
             } else if (res.ok) {
               onLoginSuccess?.(res.user);
             } else if (res.code === 'bind_required') {
-              // 需要绑定到现有本地账号
+              // Need to bind to existing local account
               setOauthCtx({ provider, provider_account_id, email: res.email });
               setStage('oauth_bind');
               setBanner('Account Binding required');
@@ -197,9 +197,9 @@ const LoginPage = ({ onLoginSuccess }) => {
                 <input type="password" name="loginPassword" value={formData.loginPassword} onChange={handleInputChange} placeholder="Password" required />
                 <button type="submit">Sign In</button>
                 
-                {/* 快速测试登录 */}
-                <div style={{ margin: '10px 0', padding: '10px', background: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '12px', color: '#0369a1', marginBottom: '8px' }}>Quick Test Login:</div>
+                {/* Quick test login */}
+                <div style={{ margin: '12px 0', padding: '16px', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '1px solid #22c55e', borderRadius: '12px' }}>
+                  <div style={{ fontSize: '13px', color: '#15803d', marginBottom: '12px', fontWeight: 600 }}>Quick Test Login:</div>
                   <button 
                     type="button" 
                     onClick={() => {
@@ -235,7 +235,7 @@ const LoginPage = ({ onLoginSuccess }) => {
           </>
         )}
 
-        {/* 第三方：完善资料 */}
+        {/* Third-party: Complete profile */}
         {stage === 'oauth_profile' && (
           <div className="form">
             <div>Complete Profile</div>
@@ -251,14 +251,14 @@ const LoginPage = ({ onLoginSuccess }) => {
                 const upd = dbApi.updateUserProfile(oauthCtx.user.id, { name: formData.regName });
                 if (upd.ok) return onLoginSuccess?.(upd.user);
               }
-              // 兜底：直接继续
+              // Fallback: continue directly
               onLoginSuccess?.(oauthCtx?.user);
             }}>Continue</button>
             <div className="link"><a href="#back" onClick={(e)=>{e.preventDefault(); setStage('auth'); setBanner('');}}>Back</a></div>
           </div>
         )}
 
-        {/* 第三方：账号绑定 */}
+        {/* Third-party: Account binding */}
         {stage === 'oauth_bind' && (
           <div className="form">
             <div>Account Binding</div>

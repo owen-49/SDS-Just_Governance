@@ -7,7 +7,7 @@ const TermsAndConditions = () => {
       title="Terms and Conditions" 
       lastUpdated="September 3, 2025"
     >
-      {/* 开头声明 */}
+      {/* Opening statement */}
       <section id="introduction">
         <p>
           This agreement applies as between you, the User of this Website and Just Governance Pty Ltd (Just Governance), the owner(s) of this Website. Your agreement to comply with and be bound by Clauses 1, 2, 4 – 11 and 15 – 25 of these Terms and Conditions is deemed to occur upon your first use of the Website. Clauses 3 and 12 – 14 apply only to the sale of Services. If you do not agree to be bound by these Terms and Conditions, you should stop using the Website immediately.

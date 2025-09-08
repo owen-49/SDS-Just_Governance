@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverview, onProfile, onSignOut, user }) {
+export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverview, onProfile, onSignOut, user, currentTopicId, onBackToHome }) {
   return (
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -58,6 +58,36 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
         >
           Just Governance
         </Link>
+        {currentTopicId && onBackToHome && (
+          <button 
+            onClick={onBackToHome}
+            style={{
+              background: 'rgba(34, 197, 94, 0.1)',
+              border: '1px solid rgba(34, 197, 94, 0.2)',
+              borderRadius: '6px',
+              color: '#059669',
+              cursor: 'pointer',
+              padding: '6px 12px',
+              fontSize: '14px',
+              fontWeight: 500,
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = 'rgba(34, 197, 94, 0.15)';
+              e.target.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'rgba(34, 197, 94, 0.1)';
+              e.target.style.transform = 'translateY(0)';
+            }}
+            title="Back to Home"
+          >
+            ← Home
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -3,12 +3,12 @@ import { sections } from '../data/structure';
 
 export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onToggleModule, onSelectTopic, currentTopicId, user }) {
   const collapsed = ui?.collapsed;
-  // 新增：主题搜索
+  // Added: topic search
   const [query, setQuery] = useState('');
   const renderSections = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return sections;
-    // 过滤：仅保留名称匹配的 section/module/topic；无匹配则剔除
+    // Filter: only keep section/module/topic with matching names; remove if no matches
     return sections
       .map(sec => {
         const matchedModules = (sec.modules || []).map(mod => {
@@ -37,7 +37,7 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
         <button onClick={onToggleCollapsed} title={collapsed ? 'Expand' : 'Collapse'} style={{ background: 'transparent', color: '#e2e8f0', border: 'none', cursor: 'pointer', fontSize: 16 }}>{collapsed ? '›' : '‹'}</button>
       </div>
 
-      {/* 搜索框（展开时显示） */}
+      {/* Search box (displayed when expanded) */}
       {!collapsed && (
         <div style={{ padding: '0 12px 8px' }}>
           <div style={{
@@ -74,12 +74,12 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
               </div>
 
               {(ui.expanded?.[sec.id] || query) && (
-                <div style={{ paddingLeft: 12 }}>
+                <div>
                   {sec.modules.map(mod => (
                     <div key={mod.id}>
                       {/* module 行 */}
                       <div
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', cursor: 'pointer', opacity: 0.98, borderRadius: 8,
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', cursor: 'pointer', opacity: 0.98, borderRadius: 8,
                                  background: ui.expanded?.[mod.id] || query ? 'rgba(148,163,184,0.06)' : 'transparent' }}
                         onClick={() => !query && onToggleModule(mod.id)}
                         title={mod.name}
@@ -89,7 +89,7 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
                       </div>
 
                       {(ui.expanded?.[mod.id] || query) && (
-                        <div style={{ paddingLeft: 12 }}>
+                        <div style={{ paddingLeft: 24 }}>
                           {mod.topics.map(tp => {
                             const active = currentTopicId === tp.id;
                             return (
