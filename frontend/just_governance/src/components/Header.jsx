@@ -12,7 +12,7 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
       backdropFilter: 'blur(10px)',
       position: 'sticky',
       top: 0,
-      zIndex: 100
+      zIndex: 1000
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <button 
@@ -170,7 +170,7 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
         >
           🔔
         </button>
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', zIndex: 1000 }}>
           <details>
             <summary style={{ 
               listStyle: 'none', 
@@ -221,7 +221,8 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
               borderRadius: '12px', 
               minWidth: 220, 
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              zIndex: 10001
             }}>
               <button 
                 onClick={onProfile} 

@@ -121,34 +121,6 @@ export const dbApi = {
     // No-op, pretend email sent
     return { ok: true };
   },
-  createEmailVerificationToken(email) {
-    const db = readDB();
-    ensure(db, 'email_verification_tokens', {});
-    const token = Math.floor(100000 + Math.random() * 900000).toString(); // 6位数字验证码
-    const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10分钟过期
-    db.email_verification_tokens[email] = { token, expires_at, used_at: null };
-    writeDB(db);
-    console.log(`Verification code for ${email}: ${token}`); // 开发环境显示验证码
-    return { ok: true, token };
-  },
-  consumeEmailVerificationToken(token) {
-    const db = readDB();
-    ensure(db, 'email_verification_tokens', {});
-    // 查找匹配的token
-    for (const [email, data] of Object.entries(db.email_verification_tokens)) {
-      if (data.token === token && !data.used_at) {
-        if (new Date(data.expires_at).getTime() < Date.now()) {
-          return { ok: false, code: 'expired' };
-        }
-        data.used_at = nowIso();
-        // 验证用户邮箱
-        this.verifyEmail(email);
-        writeDB(db);
-        return { ok: true, email };
-      }
-    }
-    return { ok: false, code: 'invalid' };
-  },
   forgotPassword(email) {
     const db = readDB();
     ensure(db, 'password_reset_tokens', {});
