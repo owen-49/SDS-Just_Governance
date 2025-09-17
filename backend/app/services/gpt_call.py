@@ -3,32 +3,28 @@ import os
 import json
 from pathlib import Path
 from fastapi import HTTPException
-from pydantic import BaseModel
 from dotenv import load_dotenv
+from functools import lru_cache
 
 # OpenAI v1 SDK
 from openai import OpenAI
+from core.config import OPENAI_API_KEY, PROMPT_PATH, OPENAI_MODEL
+from schemas.explain import ExplainOut
 
-env_path = Path(__file__).resolve().parents[1] / ".env"
-load_dotenv(dotenv_path=env_path)  # 读取 .env
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY not set in .env")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "governance.json"
-
+# 读取prompt模板 (JSON格式)
+@lru_cache()
 def _load_prompt_template() -> dict:
     if not PROMPT_PATH.exists():
         raise RuntimeError(f"Prompt template not found: {PROMPT_PATH}")
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
-class ExplainOut(BaseModel):
-    outline: list[str]
-    explanation: str
-    checklist: list[str]
+
 
 async def explain_topic(module_id: str, subtopic: str, known_points: list[str], level: str) -> dict:
     tmpl = _load_prompt_template()
@@ -91,7 +87,7 @@ async def ask_question(question: str, level: str) -> str:
     }
 
     resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=OPENAI_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(user_content, ensure_ascii=False)},
