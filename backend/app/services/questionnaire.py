@@ -2,17 +2,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from functools import lru_cache
 from typing import Dict, List
 
 from fastapi import HTTPException
+from core.config import QUESTION_PATH
+
 
 # Path to questionnaire definitions
-QUESTION_PATH = Path(__file__).resolve().parents[1] / "prompts" / "questionnaires.json"
 
-
+@lru_cache()
 def _load_all() -> Dict[str, List[Dict[str, object]]]:
-    """Load the questionnaire JSON data."""
+    # Load the questionnaire JSON data.
     if not QUESTION_PATH.exists():
         raise HTTPException(status_code=500, detail="Questionnaire definitions not found")
     with QUESTION_PATH.open("r", encoding="utf-8") as f:
