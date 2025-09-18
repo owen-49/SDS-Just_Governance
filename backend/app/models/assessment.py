@@ -1,7 +1,8 @@
 from __future__ import annotations
 import uuid
+from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Text, Boolean, Integer, Numeric, Enum, ForeignKey, PrimaryKeyConstraint
+from sqlalchemy import String, Text, Boolean, Integer, Numeric, Enum, ForeignKey, PrimaryKeyConstraint, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, uuid_pk
@@ -45,8 +46,8 @@ class AssessmentSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(AssessmentKind, nullable=False)
     topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("topics.id"))
-    started_at = mapped_column()
-    submitted_at = mapped_column()
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_score: Mapped[Optional[float]] = mapped_column(Numeric)
     ai_summary: Mapped[Optional[str]] = mapped_column(Text)
     ai_recommendation: Mapped[Optional[dict]] = mapped_column(JSONB)

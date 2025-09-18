@@ -1,7 +1,8 @@
 from __future__ import annotations
 import uuid
+from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Integer, Text, ForeignKey
+from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, uuid_pk
@@ -16,7 +17,7 @@ class Document(Base):
     source: Mapped[Optional[str]] = mapped_column(String)
     topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("topics.id"))
     metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
-    created_at = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
