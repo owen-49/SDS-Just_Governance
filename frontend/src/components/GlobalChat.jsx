@@ -37,9 +37,8 @@ const GlobalChat = ({ email }) => {
     try {
       // Call AI API
       const aiResponse = await aiAsk({
-        module_id: 'general',
         question: text,
-        context: current.messages.slice(-5) // Last 5 messages for context
+        level: 'beginner',
       });
 
       // Add AI response

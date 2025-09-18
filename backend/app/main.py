@@ -31,6 +31,6 @@ def healthz():
     return {"status": "ok"}
 
 # AI 路由
-app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api/v1/auth")
 app.include_router(chat_router, prefix="/ai")
 app.include_router(assessment_router)

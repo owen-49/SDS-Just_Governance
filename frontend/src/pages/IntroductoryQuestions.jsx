@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentLayout } from '../components/layout';
-import { dbApi } from '../services/localDb';
+import { submitOnboardingSurvey } from '../api/survey.js';
+import { me as apiMe } from '../api/auth.js';
 
 const IntroductoryQuestions = () => {
   const [answers, setAnswers] = useState({
@@ -32,16 +33,11 @@ const IntroductoryQuestions = () => {
   const [savedAt, setSavedAt] = useState(null);
   const [score, setScore] = useState(null);
   const [showResults, setShowResults] = useState(false);
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
-    const rec = dbApi.getLatestIntroQuestionnaire();
-    if (rec?.data) {
-      setAnswers(prev => ({ ...prev, ...rec.data }));
-      setSavedAt(rec.created_at);
-      if (rec.data.score) {
-        setScore(rec.data.score);
-      }
-    }
+    // 获取当前用户 user_id
+    apiMe().then(user => setUserId(user.user_id)).catch(() => setUserId(''));
   }, []);
 
   const handleRadio = (key, value) => {
@@ -120,7 +116,7 @@ const IntroductoryQuestions = () => {
     
     // Q10 scoring
     if (answers.q10 === 'Not very comfortable' || answers.q10 === 'Not sure') totalScore += 1;
-    else if (answers.q10 === 'Sometimes comfortable') totalScore += 2;
+    else if (answers.q10 === 'Sometimes comfortable' ) totalScore += 2;
     else if (answers.q10 === 'Very comfortable') totalScore += 3;
     
     // Q12 scoring
@@ -194,26 +190,56 @@ const IntroductoryQuestions = () => {
     }
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     const finalScore = calculateScore();
     setScore(finalScore);
-    
-    const res = dbApi.saveIntroQuestionnaire({ ...answers, score: finalScore });
-    if (res.ok) {
-      setSavedAt(res.record.created_at);
+    if (!userId) {
+      alert('Please sign in before submitting.');
+      return;
+    }
+    // 组装 answers
+    const answersArr = [];
+    // Q1
+    answersArr.push({ key: 'confidence_in_boards', value: answers.q1 });
+    // Q2
+    Object.entries(answers.q2).forEach(([k, v]) => {
+      answersArr.push({ key: `familiar_${k.replace(/\s+/g, '_').toLowerCase()}`, value: v });
+    });
+    // Q3
+    answersArr.push({ key: 'interest_motivation', values: answers.q3, text: answers.q3_other });
+    // Q4
+    answersArr.push({ key: 'familiarity_with_governance', value: answers.q4 });
+    // Q5
+    answersArr.push({ key: 'clarity_of_goals', value: answers.q5 });
+    // Q6
+    answersArr.push({ key: 'board_experience', value: answers.q6 });
+    // Q7
+    answersArr.push({ key: 'learning_preferences', values: answers.q7, text: answers.q7_other });
+    // Q8
+    answersArr.push({ key: 'meeting_frequency', value: answers.q8 });
+    // Q9
+    answersArr.push({ key: 'unfamiliar_terms', values: answers.q9 });
+    // Q10
+    answersArr.push({ key: 'comfort_with_finance', value: answers.q10 });
+    // Q11
+    answersArr.push({ key: 'preferred_topics', values: answers.q11, text: answers.q11_other });
+    // Q12
+    answersArr.push({ key: 'interest_in_leadership', value: answers.q12 });
+    // Q13
+    answersArr.push({ key: 'future_goals', values: answers.q13, text: answers.q13_other });
+    try {
+      const res = await submitOnboardingSurvey({ user_id: userId, answers: answersArr });
+      setSavedAt(new Date().toISOString());
       setShowResults(true);
-      // Scroll to results
       setTimeout(() => {
         const resultsElement = document.getElementById('results-section');
         if (resultsElement) {
           resultsElement.scrollIntoView({ behavior: 'smooth' });
         }
       }, 100);
-    } else if (res.code === 'not_logged_in') {
-      alert('Please sign in before submitting.');
-    } else {
-      alert('Failed to save. Please try again.');
+    } catch (err) {
+      alert(err.message || 'Failed to submit. Please try again.');
     }
   };
 

@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import '../styles/auth.css';
-import { dbApi } from '../services/localDb';
+import {
+  register as apiRegister,
+  login as apiLogin,
+  me as apiMe,
+  verifyEmail as apiVerifyEmail,
+  resendVerification as apiResendVerification,
+  forgotPassword as apiForgotPassword,
+  resetPassword as apiResetPassword
+} from '../api/auth.js';
 
 const LoginPage = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState('login');
@@ -31,117 +39,193 @@ const LoginPage = ({ onLoginSuccess }) => {
     }));
   };
 
-  const onLogin = (e) => {
+  const onLogin = async (e) => {
     e.preventDefault();
     const { loginEmail, loginPassword } = formData;
     if (!loginEmail || !loginPassword) return setBanner('Please enter email and password');
-    const res = dbApi.login(loginEmail, loginPassword);
-    if (!res.ok) {
-      if (res.code === 'no_account') setBanner('Account not found · Go to Sign Up');
-      else if (res.code === 'wrong_password') setBanner('Incorrect password · Forgot Password?');
-      else if (res.code === 'unverified') {
-        setBanner('Please verify your email first');
-        // Send verification email and navigate to verification page
-        const r = dbApi.createEmailVerificationToken(loginEmail);
-        if (r.ok) {
-          setVerify({ email: loginEmail, token: r.token });
-          setStage('verify');
+    try {
+      const res = await apiLogin(loginEmail, loginPassword);
+      
+      // 检查响应格式
+      if (res.code === 0) {
+        // 登录成功，保存 token
+        localStorage.setItem('access_token', res.data.access_token);
+        setBanner('Login successful');
+        
+        // 检查是否首次登录需要显示介绍
+        if (res.data.show_intro) {
+          setBanner('Welcome! Showing project introduction...');
+          // TODO: 显示项目简介modal
+        }
+        
+        onLoginSuccess?.(res.data.user);
+      } else {
+        // Handle various error cases
+        if (res.code === 3001) {
+          setBanner('Account not found');
+        } else if (res.code === 2001) {
+          setBanner('Incorrect password');
+        } else if (res.code === 4001) {
+          setBanner('Email not verified, please verify your email first');
+          // 可以显示重新发送验证邮件的选项
+        } else {
+          setBanner(res.message || 'Login failed');
         }
       }
-      return;
+    } catch (err) {
+      setBanner(err.message || 'Login failed');
     }
-    onLoginSuccess?.(res.user);
   };
 
-  const onRegister = (e) => {
+  const onRegister = async (e) => {
     e.preventDefault();
     const { regEmail, regPassword, regConfirm, regName, regTerms } = formData;
     if (!regEmail || !regPassword || !regConfirm) return setBanner('Please fill all required fields');
     if (regPassword !== regConfirm) return setBanner('Passwords do not match');
+    if (regPassword.length < 8) return setBanner('Password must be at least 8 characters');
     if (!regTerms) return setBanner('Please accept the terms');
-    const res = dbApi.register(regEmail, regPassword, regName);
-    if (!res.ok && res.code === 'exists') {
-      setBanner('This email is already registered. Go to Sign In.');
-      setActiveTab('login');
-      return;
+    
+    try {
+      const res = await apiRegister(regEmail, regPassword, regName);
+      
+      if (res.code === 0) {
+        // 注册成功
+        setVerify({ email: regEmail, token: '' });
+        setBanner('Registration successful · A verification link has been sent to your email');
+        setStage('verify');
+      } else {
+        // 处理错误情况
+        if (res.code === 4001 && res.message === 'email already exists') {
+          setBanner('This email is already registered. Please go to Sign In.');
+          setActiveTab('login');
+        } else if (res.code === 2001) {
+          setBanner('Please check your input: ' + res.message);
+        } else {
+          setBanner(res.message || 'Registration failed');
+        }
+      }
+    } catch (err) {
+      setBanner(err.message || 'Registration failed');
     }
-    // Registration successful → send verification email and redirect to verification page
-    const r = dbApi.createEmailVerificationToken(regEmail);
-    if (r.ok) setVerify({ email: regEmail, token: r.token });
-    setBanner('Verify your email · A verification link has been sent');
-    setStage('verify');
   };
 
-  const onResendVerify = () => {
+  const onResendVerify = async () => {
     const email = verify.email || formData.regEmail || formData.loginEmail;
     if (!email) return setBanner('Enter your email then resend');
-    const r = dbApi.createEmailVerificationToken(email);
-    if (r.ok) setVerify({ email, token: r.token });
-    setBanner('Verification email resent');
-  };
-
-  const onDoVerify = () => {
-    if (!verify.token || !verify.email) return setBanner('Missing verification link');
-    const r = dbApi.consumeEmailVerificationToken(verify.token);
-    if (!r.ok) return setBanner('Link expired · Resend verification email');
-    setBanner('Email verified');
-    const tryPwd = formData.regPassword || formData.loginPassword || '';
-    if (tryPwd) {
-      const login = dbApi.login(verify.email, tryPwd);
-      if (login.ok) return onLoginSuccess?.(login.user);
+    try {
+      const res = await apiResendVerification(email);
+      if (res.code === 0) {
+        setBanner('Verification email resent successfully');
+      } else if (res.code === 3001) {
+        setBanner('User not found');
+      } else if (res.code === 4001) {
+        setBanner('Email already verified');
+      } else {
+        setBanner(res.message || 'Resend verification failed');
+      }
+    } catch (err) {
+      setBanner(err.message || 'Resend verification failed');
     }
-    setActiveTab('login');
-    setStage('auth');
   };
 
-  const onForgot = (e) => {
+  const onDoVerify = async () => {
+    if (!verify.token) return setBanner('Please enter the verification token from your email');
+    try {
+      const res = await apiVerifyEmail(verify.token);
+      if (res.code === 0) {
+        setBanner('Email verified successfully! You can now login.');
+        setActiveTab('login');
+        setStage('auth');
+      } else if (res.code === 3001) {
+        setBanner('Verification link not found');
+      } else if (res.code === 4001) {
+        setBanner('Verification link expired or already used · Please resend verification email');
+      } else {
+        setBanner(res.message || 'Verification failed');
+      }
+    } catch (err) {
+      setBanner(err.message || 'Verification failed');
+    }
+  };
+
+  const onForgot = async (e) => {
     e.preventDefault();
     if (!formData.forgotEmail) return setBanner('Please enter email');
-    const { token } = dbApi.forgotPassword(formData.forgotEmail);
-    setBanner('Reset email sent');
-    setFormData(f => ({ ...f, resetEmail: formData.forgotEmail, resetToken: token }));
-    setStage('reset');
+    try {
+      const res = await apiForgotPassword(formData.forgotEmail);
+      if (res.code === 0) {
+        setBanner('Reset instructions sent to your email if the account exists');
+        setFormData(f => ({ ...f, resetEmail: formData.forgotEmail, resetToken: '' }));
+        setStage('reset');
+      } else {
+        setBanner(res.message || 'Failed to send reset email');
+      }
+    } catch (err) {
+      setBanner(err.message || 'Failed to send reset email');
+    }
   };
 
-  const onReset = (e) => {
+  const onReset = async (e) => {
     e.preventDefault();
-    const { resetEmail, resetToken, resetPassword1, resetPassword2 } = formData;
+    const { resetToken, resetPassword1, resetPassword2 } = formData;
+    if (!resetToken) return setBanner('Please enter the reset token from your email');
     if (!resetPassword1 || !resetPassword2) return setBanner('Enter new password');
     if (resetPassword1 !== resetPassword2) return setBanner('Passwords do not match');
-    const r = dbApi.resetPassword(resetEmail, resetToken, resetPassword1);
-    if (!r.ok) return setBanner('Reset link expired · Resend');
-    setBanner('Password reset successfully');
-    setStage('auth');
-    setActiveTab('login');
+    if (resetPassword1.length < 8) return setBanner('Password must be at least 8 characters');
+    
+    try {
+      const res = await apiResetPassword(resetToken, resetPassword1);
+      if (res.code === 0) {
+        setBanner('Password reset successfully! You can now login with your new password.');
+        setStage('auth');
+        setActiveTab('login');
+      } else if (res.code === 3001) {
+        setBanner('Reset link not found');
+      } else if (res.code === 4001) {
+        setBanner('Reset link expired or already used · Please request a new reset email');
+      } else {
+        setBanner(res.message || 'Reset failed');
+      }
+    } catch (err) {
+      setBanner(err.message || 'Reset failed');
+    }
   };
 
+  // Quick test login
+  const onQuickTestLogin = async () => {
+    try {
+      // First create test user
+      const createRes = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000'}/api/v1/auth/create-test-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const createData = await createRes.json();
+      
+      // Then login with test user
+      const res = await apiLogin('test@example.com', '123456');
+      
+      if (res.code === 0) {
+        localStorage.setItem('access_token', res.data.access_token);
+        setBanner('Test user login successful!');
+        if (res.data.show_intro) {
+          setBanner('Welcome! Showing project introduction...');
+        }
+        onLoginSuccess?.(res.data.user);
+      } else {
+        setBanner(res.message || 'Test login failed');
+      }
+    } catch (err) {
+      setBanner(err.message || 'Test login failed');
+    }
+  };
+
+  // TODO: 第三方登录相关功能未实现，以下为占位处理
   const ThirdPartyButtons = () => (
     <div className="third-party-buttons">
       {['Google', 'Microsoft', 'LinkedIn', 'Apple'].map(p => (
         <button key={p} className="third-party-btn" onClick={() => {
-          try {
-            const provider = p.toLowerCase();
-            const provider_account_id = Math.random().toString(36).slice(2);
-            const res = dbApi.oauthFindOrCreate(provider, provider_account_id, {});
-            if (res.ok && res.isNew) {
-              // First authorization: complete profile, don't redirect immediately
-              setOauthCtx({ provider, provider_account_id, email: res.user.email, user: res.user });
-              setStage('oauth_profile');
-              setBanner('Complete your profile to continue');
-            } else if (res.ok) {
-              onLoginSuccess?.(res.user);
-            } else if (res.code === 'bind_required') {
-              // Need to bind to existing local account
-              setOauthCtx({ provider, provider_account_id, email: res.email });
-              setStage('oauth_bind');
-              setBanner('Account Binding required');
-            } else {
-              setBanner('Authorization not completed');
-            }
-          } catch {
-            setBanner('Authorization not completed');
-          }
-        }} >{p}</button>
+          setBanner('Third-party login not implemented yet');
+        }}>{p}</button>
       ))}
     </div>
   );
@@ -202,11 +286,9 @@ const LoginPage = ({ onLoginSuccess }) => {
                   <div style={{ fontSize: '13px', color: '#15803d', marginBottom: '12px', fontWeight: 600 }}>Quick Test Login:</div>
                   <button 
                     type="button" 
-                    onClick={() => {
-                      const res = dbApi.createTestAccountsAndLogin();
-                      if (res.ok) onLoginSuccess?.(res.user);
-                    }}
+                    onClick={onQuickTestLogin}
                     className="test-login-btn"
+                    style={{ backgroundColor: '#22c55e', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
                   >
                     Use Test Account (test@example.com / 123456)
                   </button>
@@ -247,11 +329,7 @@ const LoginPage = ({ onLoginSuccess }) => {
             </label>
             <button onClick={() => {
               if (!formData.regTerms) return setBanner('Please accept the terms');
-              if (oauthCtx?.user?.id) {
-                const upd = dbApi.updateUserProfile(oauthCtx.user.id, { name: formData.regName });
-                if (upd.ok) return onLoginSuccess?.(upd.user);
-              }
-              // Fallback: continue directly
+              // TODO: updateUserProfile 功能未实现
               onLoginSuccess?.(oauthCtx?.user);
             }}>Continue</button>
             <div className="link"><a href="#back" onClick={(e)=>{e.preventDefault(); setStage('auth'); setBanner('');}}>Back</a></div>
@@ -266,8 +344,7 @@ const LoginPage = ({ onLoginSuccess }) => {
             <input type="email" name="loginEmail" value={formData.loginEmail || oauthCtx?.email || ''} onChange={handleInputChange} placeholder="Email" />
             <input type="password" name="loginPassword" value={formData.loginPassword} onChange={handleInputChange} placeholder="Password" />
             <button onClick={() => {
-              const r = dbApi.oauthBind(formData.loginEmail || oauthCtx?.email, formData.loginPassword, oauthCtx?.provider, oauthCtx?.provider_account_id);
-              if (r.ok) onLoginSuccess?.(r.user); else if (r.code === 'wrong_password') setBanner('Incorrect password'); else setBanner('Binding failed');
+              setBanner('账号绑定功能未实现');
             }}>Bind & Continue</button>
             <div className="link"><a href="#back" onClick={(e)=>{e.preventDefault(); setStage('auth'); setBanner('');}}>Back</a></div>
           </div>
@@ -278,36 +355,10 @@ const LoginPage = ({ onLoginSuccess }) => {
             <input type="email" name="forgotEmail" value={formData.forgotEmail} onChange={handleInputChange} placeholder="Enter your email" required />
             <button type="submit">Send reset email</button>
             <div className="link">
-              <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back to Sign In</a>
-            </div>
-          </form>
-        )}
-
-        {stage === 'reset' && (
-          <form onSubmit={onReset} className="form">
-            <input type="email" name="resetEmail" value={formData.resetEmail} onChange={handleInputChange} placeholder="Email" required />
-            <input type="text" name="resetToken" value={formData.resetToken} onChange={handleInputChange} placeholder="Reset token (from email link)" required />
-            <input type="password" name="resetPassword1" value={formData.resetPassword1} onChange={handleInputChange} placeholder="New password" required />
-            <input type="password" name="resetPassword2" value={formData.resetPassword2} onChange={handleInputChange} placeholder="Confirm new password" required />
-            <button type="submit">Set new password</button>
-            <div className="link">
-              <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back to Sign In</a>
-            </div>
-          </form>
-        )}
-
-        {stage === 'verify' && (
-          <div className="form">
-            <div>Verify your email</div>
-            <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>We sent a verification link to {verify.email || formData.regEmail || formData.loginEmail}.</div>
-            <button onClick={onDoVerify}>Click verification link (simulate)</button>
-            <button onClick={onResendVerify}>Resend verification email</button>
-            <div className="link">
               <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back</a>
             </div>
-          </div>
+          </form>
         )}
-
         <div className="footer">
           <a href="/terms" style={{ textDecoration: 'underline', color: '#2563eb' }}>Terms of Service</a> | <a href="/privacy" style={{ textDecoration: 'underline', color: '#2563eb' }}>Privacy Policy</a>
         </div>

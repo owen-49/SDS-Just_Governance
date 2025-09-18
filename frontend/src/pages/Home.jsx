@@ -7,6 +7,7 @@ import { AssessmentModal, GlobalChat } from '../components/features';
 import { dbApi } from '../services/localDb';
 import { findTopicById } from '../constants/structure';
 import { aiAsk } from '../services/api';
+import { submitAssessment } from '../api/assessment.js';
 
 // TopicPage Component - handles individual topic views
 function TopicPage({ topicId, email, onBack }) {
@@ -233,9 +234,8 @@ function TopicChat({ topicId, email, chat, setChat }) {
 
     try {
       const response = await aiAsk({
-        module_id: topicId,
         question: text,
-        context: chat.messages.slice(-5)
+        level: 'beginner',
       });
       
       const aiMsg = { 
@@ -566,12 +566,17 @@ export default function Home({ user, onSignOut }) {
       <AssessmentModal 
         open={showAssessment} 
         onClose={() => setShowAssessment(false)} 
-        onSubmit={(res) => {
-          dbApi.addAssessmentRecord(user.email, { 
-            score: res.score, 
-            breakdown: [], 
-            advice: 'Focus on core modules' 
-          });
+        onSubmit={async (res) => {
+          // 假设有 module_id 和 answers
+          const module_id = 'demo_module'; // 实际应从上下文获取
+          const answers = res.detail.map(d => d.your);
+          try {
+            const apiRes = await submitAssessment({ module_id, answers });
+            // 可根据 apiRes.score、apiRes.breakdown、apiRes.advice 展示结果
+            alert(`Assessment submitted! 得分: ${apiRes.score}`);
+          } catch (err) {
+            alert(err.message || 'Assessment submit failed');
+          }
         }} 
       />
     </div>

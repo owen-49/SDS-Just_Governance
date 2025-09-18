@@ -166,9 +166,8 @@ function TopicChat({ topicId, email, chat, setChat }) {
 
     try {
       const response = await aiAsk({
-        module_id: topicId,
         question: text,
-        context: chat.messages.slice(-5)
+        level: 'beginner',
       });
       
       const aiMsg = { 

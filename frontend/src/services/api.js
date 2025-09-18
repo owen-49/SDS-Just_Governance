@@ -60,3 +60,62 @@ export async function aiAsk(params) {
   });
   return handleJSON(res, "AI Q&A failed");
 }
+
+// Auth API
+export async function register(email, password, name) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name }),
+  });
+  return handleJSON(res, 'Register failed');
+}
+
+export async function login(email, password) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  return handleJSON(res, 'Login failed');
+}
+
+export async function me(token) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  return handleJSON(res, 'Get user info failed');
+}
+
+export async function verifyEmail(token) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`);
+  return handleJSON(res, 'Email verification failed');
+}
+
+export async function resendVerification(email) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/resend-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return handleJSON(res, 'Resend verification failed');
+}
+
+export async function forgotPassword(email) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return handleJSON(res, 'Forgot password failed');
+}
+
+export async function resetPassword(token, newPassword) {
+  const res = await fetch(`${API_BASE}/api/v1/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  return handleJSON(res, 'Reset password failed');
+}
