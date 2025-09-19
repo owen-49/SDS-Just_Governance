@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 1. 找到 backend/.env 并加载
+# 1. 先找到 backend/.env 读取.env文件内容到系统环境变量
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # → backend/
 ENV_FILE = BACKEND_DIR / ".env"
 if ENV_FILE.exists():
@@ -13,7 +13,8 @@ if ENV_FILE.exists():
 # 2. 读取各项配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")   # 默认为gpt-4o
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL_ASYNC = os.getenv("DATABASE_URL_ASYNC")
+DATABASE_URL_SYNC = os.getenv("DATABASE_URL_SYNC")
 ENV = os.getenv("ENV", "dev")  # 默认为dev
         # prompts 目录：可以从环境变量读，如果没有的话就是backend/prompts
 PROMPT_PATH = Path(os.getenv("PROMPTS_DIR") or (BACKEND_DIR / "prompts" / "default.json")).resolve()
