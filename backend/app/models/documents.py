@@ -16,7 +16,7 @@ class Document(Base):
     title: Mapped[Optional[str]] = mapped_column(String)
     source: Mapped[Optional[str]] = mapped_column(String)
     topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("topics.id"))
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
+    document_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 class DocumentChunk(Base):
