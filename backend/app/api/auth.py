@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 import jwt
 
 from db.session import SessionLocal
-from models.user import User
+from original_models.user import User
 from services.mail_service import MailService
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
