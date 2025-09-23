@@ -101,35 +101,67 @@ def _log_error(level: str, request: Request, http_status: int, code: int, messag
 # ─────────────────────────────
 # 具体处理器
 # ─────────────────────────────
+
+
+
+    # 1)业务层异常处理：
+        # HTTP状态码，业务code，message，data都在抛出异常时就传参传好了
 async def handle_biz_error(request: Request, exc: BizError) -> JSONResponse:
     _log_error("warning", request, exc.http_status, exc.code, exc.message)
     return fail(http_status=exc.http_status, code=exc.code, message=exc.message, data=exc.data, request=request)
 
 
-
+    # 2) 协议层HTTP异常处理
     # 情形： raise HTTPException(status_code=404, detail="user not found")
 async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
-    http_status = exc.status_code       # status_code是在抛异常的时候设置的，因为HTTPException规定必须传status_code
-    #   根据status_code状态码得到业务错误code
+
+    # `1. 拿HTTP状态码
+    http_status = exc.status_code       # HTTPException规定必须传status_code，因此可直接从异常对象中拿
+
+    #  2. 根据上面的映射表，拿到业务code
     code = _map_http_to_biz(http_status)
-    #   exc.detail可以是任意类型（string,dict,list)，只有是字符串的时候才直接当作message透出。
+
+    #  3. 把exc.detail(httpexc的可选字段）写入message
+            #  exc.detail可以是任意类型（string,dict,list)，或为空。只有是字符串的时候才直接当作message透出。
     message = exc.detail if isinstance(exc.detail, str) else "http_error"
-    #   输出日志：包括请求信息、http响应码，code响应码，错误信息message
+
+    #  4. 输出日志： 请求信息、 http状态码， code业务码，错误信息message
     _log_error("warning", request, http_status, code, message)
 
-    #
+    #  5. 返回错误响应：
     return fail(http_status=http_status, code=code, message=message, request=request)
 
 
-    # 参数校验错误
+    # 3)字段层参数校验错误异常处理
 async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+
+    # 1. 指定HTTP状态码
     http_status = 422
+
+    # 2. 指定业务code（也可以通过映射表指定）
     code = CODE_VALIDATION_ERROR
+
+    # 3. 指定message
     message = "validation_error"
+
+    # 4.填写data
+        # 参数校验错误需要返回详细的字段错误信息，展示给用户
+            # exc.errors():
+            # {
+            #       "loc": ["body", "age"],
+            #       "msg": "value is not a valid integer",
+            #       "type": "type_error.integer"
+            #     }
     data = {"errors": exc.errors()}
+
+    # 5.输出错误日志： 请求信息，http状态码，code业务码，错误信息message，额外信息：data[errors]
     _log_error("warning", request, http_status, code, message, extra={"errors": data["errors"]})
+
+    # 6.返回错误响应：
     return fail(http_status=http_status, code=code, message=message, data=data, request=request)
 
+
+    # 4)其他异常处理
 async def handle_unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
     http_status = 500
     code = CODE_INTERNAL_ERROR
