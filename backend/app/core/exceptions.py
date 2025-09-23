@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
 # 复用已有的响应壳与业务码常量
-from app.schemas.api_response import (
+from schemas.api_response import (
     ok, fail,
     CODE_OK,
     CODE_UNAUTHORIZED,

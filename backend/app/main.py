@@ -11,7 +11,7 @@ from core.middleware.request_id import RequestIDMiddleware
 setup_logging()                 # 先初始化日志
 app = FastAPI(title="Just Governance API", version="0.1.0")
 
-# 中间件顺序：Request-ID 最靠前 → 访问日志
+# 中间件顺序：Request-ID → 访问日志
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(AccessLogMiddleware)
 app.add_middleware(
