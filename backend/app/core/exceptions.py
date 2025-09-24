@@ -1,84 +1,68 @@
-# backend/app/core/exceptions.py
+# -*- coding: utf-8 -*-
+# 本文件用于定义全局异常处理器。全局异常处理器注册到 app 后，就能够被 ExceptionMiddleware 这个中间件调用。
+# 完成两件事情：
+#   1) 处理下游抛上来的四类异常，包装成统一响应传给上游。
+#   2) 把异常信息记录日志（结构化日志；5xx 才打堆栈）。
+#
+# 统一响应壳（与全局规范保持一致）：
+#   { "code": <业务码>, "message": <短标签>, "data": <负载或null>, "request_id": <uuid> }
+#
+# 重要边界：
+#   - 字段级错误只走 422（RequestValidationError），并把字段列表放 data.errors 里；
+#   - 3xx（含 304）不包壳，遵循 HTTP 规范直接返回；
+#   - HTTPException.detail 只有是“安全字符串”才直用；结构化 detail 放 data.detail；敏感细节不直出。
+#
+# 业务层抛 BizError(http_status, code, message[, data]) 时，按给定值直接返回（不查表）。
+# 框架/协议层 HTTPException(status_code=...) 时，按 “HTTP→默认业务码” 兜底映射。
+#
+# 参考文档：响应与异常（码表/规则/示例）。
 from __future__ import annotations
+
 import logging
 from typing import Any, Optional
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
-# 复用已有的响应壳与业务码常量
-from schemas.api_response import (
-    ok, fail,
-    CODE_OK,
-    CODE_UNAUTHORIZED,
-    CODE_FORBIDDEN,
-    CODE_VALIDATION_ERROR,
-    CODE_NOT_FOUND,
-    CODE_CONFLICT,
-    CODE_RATE_LIMITED,
-    CODE_INTERNAL_ERROR,
-)
+# 复用已有的响应壳
+from schemas.api_response import ok, fail
+
+# 码表与映射（单一事实源）
+from core.codes import BizCode, CODE_META, default_biz_for_http, label_for, CODE_TO_HTTP_HINT
 
 logger = logging.getLogger(__name__)
 
 
-# ─────────────────────────────
-# 自定义业务异常（路由里直接 raise）
-# ─────────────────────────────
+# ---------------------------- 自定义业务异常 -----------------------------------
 class BizError(Exception):
     """
     业务异常：统一携带 http_status + biz_code + message (+ data)
-    例：raise BizError(409, CODE_CONFLICT, "email already exists")
+    例：raise BizError(409, BizCode.EMAIL_EXISTS, "email_exists")
+    说明：message 建议用“稳定短标签”；若未提供，将按码表默认标签填充。
     """
-    def __init__(self, http_status: int, code: int, message: str, data: Optional[Any] = None):
-        self.http_status = http_status
-        self.code = code
-        self.message = message
+    def __init__(self, http_status: int, code: int | BizCode, message: Optional[str] = None,
+                 data: Optional[Any] = None):
+        self.http_status = int(http_status)
+        self.code = int(code)
+        self.message = message or label_for(self.code)
         self.data = data
-        super().__init__(message)
-
-# ─────────────────────────────
-# HTTP → 业务码 映射
-# ─────────────────────────────
-_HTTP_TO_BIZ = {
-    401: CODE_UNAUTHORIZED, #  "未认证“
-            # 客户端尚未提供有效凭证或已过期；常带 WWW-Authenticate。动作：引导登录/刷新令牌。
-
-    403: CODE_FORBIDDEN,    # ”已认证但无权限“
-             # 登录了，但没权限访问此资源/操作。动作：提示无权限/引导申请或切换账号。
-
-    404: CODE_NOT_FOUND,    # ”资源不存在“或”不提供资源
-             # 路由不存在或资源不存在（也可用于“不想暴露资源是否存在”）。动作：提示不存在/返回上一页。
-
-    409: CODE_CONFLICT,
-            #
-    422: CODE_VALIDATION_ERROR, # 参数校验错误
-
-    429: CODE_RATE_LIMITED,
-            # 触发限流。若有 Retry-After（秒或日期），前端可据此倒计时/禁用按钮。动作：提示稍后再试。
-
-    400: CODE_VALIDATION_ERROR,  # 常见为参数/语义错误
-}
-
-def _map_http_to_biz(http_status: int) -> int:
-    if http_status in _HTTP_TO_BIZ:
-        return _HTTP_TO_BIZ[http_status]
-    if http_status >= 500:
-        return CODE_INTERNAL_ERROR
-    # 兜底：其它 4xx 默认按校验/请求错误处理
-    if 400 <= http_status < 500:
-        return CODE_VALIDATION_ERROR
-    return CODE_INTERNAL_ERROR
-
-def _rid(request: Request) -> Optional[str]:
-    return getattr(getattr(request, "state", None), "request_id", None)
+        super().__init__(self.message)
 
 
-# level: 日志级别     request: 当前请求对象（携带信息）   http_status: HTTP状态码  code：业务码，比如 1001、2001、9001
-# message: 错误信息，比如 "email already exists"
-# extra: dict | None = None,    # 可选：额外携带的错误信息，如字段校验错误
-# exc: BaseException | None = None  # 可选：异常对象（用于记录堆栈）
-def _log_error(level: str, request: Request, http_status: int, code: int, message: str, extra: dict | None = None, exc: BaseException | None = None):
+# ------------------------ request_id 提取 ------------------------
+def _rid(request: Request | None) -> Optional[str]:
+    return getattr(getattr(request, "state", None), "request_id", None) if request else None
+
+
+# ------------------------ 结构化错误日志 ------------------------
+# level: 日志级别     request: 当前请求对象（携带信息）
+# http_status: HTTP 状态码  code：业务码，比如 1001、2001、9001
+# error_message: 错误短标签，比如 "email_exists"
+# error_extra: dict | None = None,    # 可选：额外携带的错误信息，如字段校验错误
+# exc: BaseException | None = None    # 可选：异常对象（用于记录堆栈；仅 5xx 打）
+def _log_error(level: str, request: Request, http_status: int, code: int, error_message: str,
+               error_extra: dict | None = None, exc: BaseException | None = None):
     payload = {
         "event": "api_error",
         "request_id": _rid(request),
@@ -86,97 +70,88 @@ def _log_error(level: str, request: Request, http_status: int, code: int, messag
         "method": request.method,
         "http_status": http_status,
         "code": code,
-        "message": message,
-        **(extra or {}),
+        "error_message": error_message,
+        **(error_extra or {}),  # ** 是字典解包运算
     }
     if level == "warning":
-        logger.warning(payload)
+        logger.warning("", extra={"extra": payload})
     elif level == "info":
-        logger.info(payload)
+        logger.info("", extra={"extra": payload})
     else:
-        # error 默认带堆栈（未知异常/500）
-        logger.exception(payload if exc else str(payload))
+        # 仅在 error 级别时带堆栈（exc_info 是三元组：(exc_type, exc_value, traceback_obj)）
+        logger.error("", extra={"extra": payload}, exc_info=exc)
 
 
-# ─────────────────────────────
-# 具体处理器
-# ─────────────────────────────
+# -----------------------------------具体处理器--------------------------------------------
 
-
-
-    # 1)业务层异常处理：
-        # HTTP状态码，业务code，message，data都在抛出异常时就传参传好了
+# 1) 业务层异常处理：
 async def handle_biz_error(request: Request, exc: BizError) -> JSONResponse:
+    # 仅做一致性“提示性”校验：如果 code 的典型 http_hint 与传入 http 不一致，打告警日志（不强改）
+    try:
+        hint = CODE_TO_HTTP_HINT.get(BizCode(exc.code))
+        if hint and hint != exc.http_status:
+            logger.warning("", extra={"extra": {
+                "event": "api_error_code_http_mismatch",
+                "request_id": _rid(request),
+                "code": exc.code, "expected_http": hint, "given_http": exc.http_status
+            }})
+    except Exception:
+        pass
+
     _log_error("warning", request, exc.http_status, exc.code, exc.message)
     return fail(http_status=exc.http_status, code=exc.code, message=exc.message, data=exc.data, request=request)
 
 
-    # 2) 协议层HTTP异常处理
-    # 情形： raise HTTPException(status_code=404, detail="user not found")
+# 2) 协议层 HTTP 异常处理（HTTPException）
+# 情形： raise HTTPException(status_code=404, detail="user not found", headers={"X": "..."})
 async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+    http_status = exc.status_code
+    code = int(default_biz_for_http(http_status))
 
-    # `1. 拿HTTP状态码
-    http_status = exc.status_code       # HTTPException规定必须传status_code，因此可直接从异常对象中拿
+    # message 的选择：
+    # - detail 是“安全字符串”时直接透出（调试友好）；
+    # - 否则用码表默认 label；若 detail 为结构化（dict/list），则放入 data.detail。
+    if isinstance(exc.detail, str) and exc.detail:
+        message = exc.detail
+        data = None
+    else:
+        message = label_for(code)
+        data = {"detail": exc.detail} if exc.detail not in (None, "") else None
 
-    #  2. 根据上面的映射表，拿到业务code
-    code = _map_http_to_biz(http_status)
+    # 405 可带 Allow 提示，429/503 可配合 Retry-After（响应头由上游中间件设置）
+    if isinstance(getattr(exc, "headers", None), dict):
+        allow = exc.headers.get("Allow")
+        if allow:
+            data = (data or {}) | {"allow": [m.strip() for m in allow.split(",")]}
 
-    #  3. 把exc.detail(httpexc的可选字段）写入message
-            #  exc.detail可以是任意类型（string,dict,list)，或为空。只有是字符串的时候才直接当作message透出。
-    message = exc.detail if isinstance(exc.detail, str) else "http_error"
-
-    #  4. 输出日志： 请求信息、 http状态码， code业务码，错误信息message
     _log_error("warning", request, http_status, code, message)
-
-    #  5. 返回错误响应：
-    return fail(http_status=http_status, code=code, message=message, request=request)
-
-
-    # 3)字段层参数校验错误异常处理
-async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-
-    # 1. 指定HTTP状态码
-    http_status = 422
-
-    # 2. 指定业务code（也可以通过映射表指定）
-    code = CODE_VALIDATION_ERROR
-
-    # 3. 指定message
-    message = "validation_error"
-
-    # 4.填写data
-        # 参数校验错误需要返回详细的字段错误信息，展示给用户
-            # exc.errors():
-            # {
-            #       "loc": ["body", "age"],
-            #       "msg": "value is not a valid integer",
-            #       "type": "type_error.integer"
-            #     }
-    data = {"errors": exc.errors()}
-
-    # 5.输出错误日志： 请求信息，http状态码，code业务码，错误信息message，额外信息：data[errors]
-    _log_error("warning", request, http_status, code, message, extra={"errors": data["errors"]})
-
-    # 6.返回错误响应：
     return fail(http_status=http_status, code=code, message=message, data=data, request=request)
 
 
-    # 4)其他异常处理
+# 3) 字段层参数校验错误异常处理（422）
+async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    http_status = 422
+    code = int(BizCode.VALIDATION_ERROR)
+    message = label_for(code)
+    # Pydantic/FastAPI 的标准字段错误结构；前端据此逐字段渲染
+    data = {"errors": exc.errors()}
+    _log_error("warning", request, http_status, code, message, error_extra={"errors": data["errors"]})
+    return fail(http_status=http_status, code=code, message=message, data=data, request=request)
+
+
+# 4) 其他异常处理（500 兜底）
 async def handle_unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
     http_status = 500
-    code = CODE_INTERNAL_ERROR
-    message = "internal_error"
+    code = int(BizCode.INTERNAL_ERROR)
+    message = label_for(code)
     _log_error("error", request, http_status, code, message, exc=exc)
     return fail(http_status=http_status, code=code, message=message, request=request)
 
 
-# ─────────────────────────────
-# 对外注册入口
-# ─────────────────────────────
+# 注册异常处理器的入口：
 def setup_exception_handlers(app: FastAPI) -> None:
-    """
-    在应用启动时调用一次，把全局异常接住并统一为规范响应。
-    """
+    # 把异常类型 --> 处理函数的映射登记到 app 上。
+    # ExceptionMiddleware 捕获异常时，会按映射查找匹配处理器。
     app.add_exception_handler(BizError, handle_biz_error)
     app.add_exception_handler(RequestValidationError, handle_validation_error)
     app.add_exception_handler(HTTPException, handle_http_exception)
