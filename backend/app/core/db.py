@@ -1,30 +1,37 @@
 # backend/app/core/db.py: 专门封装数据库的运行环境
-# 给 FastAPI 提供数据库 Session 会话
-# get_db() 是 FastAPI 的依赖注入入口（用 Depends()）
-# backend/app/core/db.py
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    # 给 FastAPI 提供数据库 Session 会话
+    # get_db() 是 FastAPI 的依赖注入入口（用 Depends()）
+    # backend/app/core/db.py
+from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     AsyncEngine,
     AsyncSession,
-    async_sessionmaker,   # ✅ 2.0 推荐
+    async_sessionmaker,
 )
 from core.config import DATABASE_URL_ASYNC
 
 engine: AsyncEngine = create_async_engine(
     DATABASE_URL_ASYNC,
-    pool_pre_ping=True,   # 连接取出前 ping 一下，避免“僵尸连接”
+    pool_pre_ping=True,   # 连接取出前 ping 一下，否则丢弃并重新建立连接。避免“僵尸连接”
     future=True,          # 统一 2.0 行为
 )
 
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
+    expire_on_commit=False,   # 提交后对象仍能被访问属性
+    autoflush=False,    # 手动flush
 )
 
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()  # 自动回滚异常事务
+            raise
+
+
 

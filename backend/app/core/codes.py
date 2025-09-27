@@ -13,21 +13,21 @@ from __future__ import annotations
 from enum import IntEnum
 from dataclasses import dataclass
 
-# =========================
-# 业务码分段（与文档一致）
-# =========================
+
+# 业务码枚举类：防止乱填业务码
 class BizCode(IntEnum):
     # 成功
     OK = 0
 
     # 1xxx 鉴权/权限
-    UNAUTHENTICATED = 1001
-    TOKEN_EXPIRED = 1003
-    TOKEN_INVALID = 1004
-    FORBIDDEN = 1002
-    FORBIDDEN_ROLE = 1101
-    FEATURE_FLAG_OFF = 1102
-    QUOTA_EXCEEDED = 1103
+    UNAUTHENTICATED = 1001  # 未登录/无凭证 401
+    TOKEN_EXPIRED = 1003    # 凭证过期 401
+    TOKEN_INVALID = 1004    # 凭证无效/伪造/非法/签名失败 401
+
+    FORBIDDEN = 1002        # 权限不足/策略禁止 403
+    FORBIDDEN_ROLE = 1101   #  角色不匹配 403
+    FEATURE_FLAG_OFF = 1102 # 功能未开启 403
+    QUOTA_EXCEEDED = 1103   # 配额/策略额度已满 403
 
     # 2xxx 请求/校验/协议
     VALIDATION_ERROR = 2001

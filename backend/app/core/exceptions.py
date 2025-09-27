@@ -42,11 +42,12 @@ class BizError(Exception):
     说明：message 建议用“稳定短标签”；若未提供，将按码表默认标签填充。
     """
     def __init__(self, http_status: int, code: int | BizCode, message: Optional[str] = None,
-                 data: Optional[Any] = None):
+                 data: Optional[Any] = None, headers: dict[str, str] | None = None):
         self.http_status = int(http_status)
         self.code = int(code)
         self.message = message or label_for(self.code)
         self.data = data
+        self.headers = headers  # NEW
         super().__init__(self.message)
 
 

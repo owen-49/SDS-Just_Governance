@@ -6,6 +6,7 @@ from .chat import ChatSession, ChatMessage
 from .assessment import Question, QuestionTopic, AssessmentSession, AssessmentItem
 from .documents import Document, DocumentChunk
 from .survey import OnboardingSurvey, OnboardingSurveyAnswer, OnboardingSurveyOption
+from .user_sessions import UserSession
 
 __all__ = [
     "Base",

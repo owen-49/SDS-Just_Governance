@@ -1,15 +1,20 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import (
-    String, Text, DateTime, UniqueConstraint, ForeignKey, Enum
+    String, Text, DateTime, UniqueConstraint, ForeignKey, Enum, Boolean
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, uuid_pk
+if TYPE_CHECKING:
+    # 只为类型检查用；运行时不会真的 import
+    from .user_sessions import UserSession
+
+
 
 # users（账号主表）
 # 参考：数据库表结构.txt 的 users 字段与说明: contentReference[oaicite:0]{index=0}
@@ -24,10 +29,15 @@ class User(TimestampMixin, Base):
     name: Mapped[Optional[str]] = mapped_column(String)
     avatar_url: Mapped[Optional[str]] = mapped_column(Text)
     first_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # 新增字段
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     oauth_accounts: Mapped[List["OAuthAccount"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+      back_populates="user", cascade="all, delete-orphan"
     )
+
+
+    sessions : Mapped[UserSession] = relationship("UserSession", back_populates="user", lazy="noload")
 
 # 第三方账号绑定表 oauth_accounts
 # 参考：数据库表结构.txt。:contentReference[oaicite:1]{index=1}

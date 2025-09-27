@@ -1,9 +1,10 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime
+import sqlalchemy as sa
 from typing import Optional, Dict, Any
 
-from sqlalchemy import MetaData, func
+from sqlalchemy import MetaData, func, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # 让 Alembic 生成外键/唯一索引的名字更稳定（避免不同机器上名字不同）
@@ -20,8 +21,17 @@ class Base(DeclarativeBase):
 
 # 通用时间戳
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=sa.text("CURRENT_TIMESTAMP"),  # 由数据库填充，跨库可用
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=sa.text("CURRENT_TIMESTAMP"),  # 插入时初值
+        server_onupdate=sa.text("CURRENT_TIMESTAMP"),  # 由数据库在 UPDATE 时自动刷新
+        nullable=False,
+    )
 
 # 统一的 UUID 主键字段
 def uuid_pk() -> uuid.UUID:
