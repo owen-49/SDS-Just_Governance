@@ -1,53 +1,60 @@
+# backend/app/models/boards.py
 from __future__ import annotations
 import uuid
 from typing import Optional, List
-from sqlalchemy import String, Integer, Text, ForeignKey
+
+import sqlalchemy as sa
+from sqlalchemy import String, Integer, Text, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base, TimestampMixin, uuid_pk
+from .base import Base, TimestampMixin, uuid_pk_db
 
-# 四大板块 / 模块 / 主题
-# 参考：boards/modules/topics 结构。:contentReference[oaicite:4]{index=4}
 class Board(Base):
     __tablename__ = "boards"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid_pk)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
     name: Mapped[str] = mapped_column(String, nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(sa.Integer, server_default=sa.text("0"), nullable=False)
 
     modules: Mapped[List["Module"]] = relationship(back_populates="board", cascade="all, delete-orphan")
 
 class Module(Base):
     __tablename__ = "modules"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid_pk)
-    board_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("boards.id", ondelete="CASCADE"), index=True)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
+    board_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("boards.id", ondelete="CASCADE"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(sa.Integer, server_default=sa.text("0"), nullable=False)
 
     board: Mapped["Board"] = relationship(back_populates="modules")
     topics: Mapped[List["Topic"]] = relationship(back_populates="module", cascade="all, delete-orphan")
 
 class Topic(Base):
     __tablename__ = "topics"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid_pk)
-    module_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), index=True)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
+    module_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    pass_threshold: Mapped[float] = mapped_column(default=0.8)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    pass_threshold: Mapped[float] = mapped_column(
+        Numeric(3, 2), server_default=sa.text("0.80"), nullable=False
+    )
+    sort_order: Mapped[int] = mapped_column(sa.Integer, server_default=sa.text("0"), nullable=False)
 
     module: Mapped["Module"] = relationship(back_populates="topics")
     content: Mapped[Optional["TopicContent"]] = relationship(
         back_populates="topic", cascade="all, delete-orphan", uselist=False
     )
 
-# 主题内容（Markdown + 资源）
-# 参考：topic_contents 结构。:contentReference[oaicite:5]{index=5}
 class TopicContent(TimestampMixin, Base):
     __tablename__ = "topic_contents"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid_pk)
-    topic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"), unique=True, index=True)
-    body_format: Mapped[Optional[str]] = mapped_column(String, default="markdown")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
+    topic_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"),
+        unique=True, index=True, nullable=False
+    )
+    body_format: Mapped[str] = mapped_column(String, server_default=sa.text("'markdown'"), nullable=False)
     body_markdown: Mapped[Optional[str]] = mapped_column(Text)
     summary: Mapped[Optional[str]] = mapped_column(Text)
     resources: Mapped[Optional[dict]] = mapped_column(JSONB)

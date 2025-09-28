@@ -95,6 +95,7 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
     set_refresh_cookie(resp, plain_refresh, session.expires_at)
     return resp
 
+
 # 三、JWT Refresh Token 轮转（Rotation）机制
 #     这是一个 JWT 刷新接口，作用是：
 #     客户端 access token过期后，自动调用 /refresh，用 cookie 中的 refresh_token来换一个新的 access_token（并设置新的 refresh_token）
@@ -161,6 +162,7 @@ async def refresh(
     resp = ok(data=TokenOut(access_token=access).model_dump())
     set_refresh_cookie(resp, new_plain, new_sess.expires_at)
     return resp
+
 
 # 注销用户: 吊销当前 refresh token 并清除浏览器中的 refresh cookie
 @router.post("/logout")

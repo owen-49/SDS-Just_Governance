@@ -23,16 +23,23 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=sa.text("CURRENT_TIMESTAMP"),  # 由数据库填充，跨库可用
+        server_default=sa.text("CURRENT_TIMESTAMP"),  # 插入时初值
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=sa.text("CURRENT_TIMESTAMP"),  # 插入时初值
-        server_onupdate=sa.text("CURRENT_TIMESTAMP"),  # 由数据库在 UPDATE 时自动刷新
+        server_onupdate=sa.text("CURRENT_TIMESTAMP"),  # 在 UPDATE 时自动刷新
         nullable=False,
     )
 
-# 统一的 UUID 主键字段
+# 统一 UUID 主键（数据库生成）
+# ！需要为Post过热时SQL手动开启扩展：CREATE EXTENSION IF NOT EXISTS pgcrypto;
+def uuid_pk_db() -> sa.TextClause:
+    return sa.text("gen_random_uuid()")          # sqlalchemy.text() 方法，用来写“原生 SQL 表达式”。
+
+
+# 弃用：
+# 统一的 UUID 主键字段（只作用于采用ORM操作数据库的情况，手动填数据库无法自动生成uuid
 def uuid_pk() -> uuid.UUID:
     return uuid.uuid4()

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.chat import router as chat_router
 from api.assessment import router as assessment_router
-from api.auth import router as auth_router
+from deprecated.auth import router as auth_router
 from core.exceptions import setup_exception_handlers
 from core.logging_config import setup_logging
 from core.middleware.access_log import AccessLogMiddleware

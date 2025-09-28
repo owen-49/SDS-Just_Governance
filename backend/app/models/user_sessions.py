@@ -25,13 +25,13 @@ class UserSession(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid_pk)
 
     # 用户id （外键）
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
 
     # refresh token的唯一ID
-    jti: Mapped[str] = mapped_column(String(36), unique=True)
+    jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
 
     # 轮转家族ID
-    family_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    family_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
 
     # 仅存哈希（SHA-256）
     refresh_token_hash: Mapped[str] = mapped_column(String(128), unique=True)
@@ -43,10 +43,10 @@ class UserSession(Base, TimestampMixin):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # 上一次使用时间
-    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # 上一次撤销时间
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # 被哪一个新会话替换（轮转时填写）
     replaced_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -54,12 +54,12 @@ class UserSession(Base, TimestampMixin):
         default=None
     )
     # 设备信息
-    user_agent: Mapped[Optional[str]] = mapped_column(String(255), default=None)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(255))
     # IP地址
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), default=None)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
 
     # 关系（如果需要从 Session 取 User）
-    user: Mapped["User"] = relationship(back_populates="user_sessions", lazy="joined", viewonly=True)
+    user: Mapped["User"] = relationship(back_populates="sessions", lazy="joined", viewonly=True)
 
     # 便捷只读属性
     @property
