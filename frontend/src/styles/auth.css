@@ -415,3 +415,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+.field-error {
+  margin-top: -8px;
+  margin-bottom: 8px;
+  color: #dc2626;
+  font-size: 12px;
+  white-space: pre-line;
+}
