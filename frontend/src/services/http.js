@@ -67,6 +67,7 @@ export async function request(input, init = {}) {
 
   if (res.status === 401) {
     const code = errorBody?.code;
+
     if (code === 1003) { // token_expired
       const r = await refreshTokenOnce();
       if (r.ok) {
@@ -75,9 +76,14 @@ export async function request(input, init = {}) {
       }
       // 刷新失败，视作未授权
       onUnauthorized?.();
+    } else if (code === 1004 || code === 1001) {
+      // token_invalid 或 unauthenticated - 不尝试刷新，直接清理状态
+      onUnauthorized?.();
     } else {
+      // 其他401情况（未认证等）按未授权处理
       onUnauthorized?.();
     }
+
     const err = new Error('unauthorized');
     err.status = 401;
     err.body = errorBody;
@@ -92,8 +98,23 @@ export async function request(input, init = {}) {
     throw err;
   }
 
-  if (res.status === 429 || res.status === 503) {
-    const err = new Error('retry_later');
+  if (res.status === 409) {
+    const err = new Error('conflict');
+    err.status = 409;
+    err.body = errorBody;
+    throw err;
+  }
+
+  if (res.status === 429) {
+    const err = new Error('rate_limited');
+    err.status = 429;
+    err.body = errorBody;
+    err.retryAfter = retryAfter;
+    throw err;
+  }
+
+  if (res.status >= 500 && res.status < 600) {
+    const err = new Error('server_error');
     err.status = res.status;
     err.body = errorBody;
     err.retryAfter = retryAfter;
