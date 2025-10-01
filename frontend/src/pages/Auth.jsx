@@ -39,17 +39,21 @@ const LoginPage = ({ onLoginSuccess }) => {
     setBanner('');
     setFieldErrors({});
     try {
-      await authApi.login({ email: loginEmail, password: loginPassword });
+      const result = await authApi.login({ email: loginEmail, password: loginPassword });
       const me = await authApi.me();
+      
+      // 检查是否需要显示引导
+      // (按文档要求，不在此处自动弹出任何额外UI，前端可在需要时自行触发)
+
       onLoginSuccess?.(me);
     } catch (err) {
       if (err.status === 422) {
         setFieldErrors(extractFieldErrors(err.body));
-        setBanner('Validation error');
+        setBanner('Validation error. Please check the fields.');
       } else if (err.status === 401) {
         setBanner('Login failed');
       } else {
-        setBanner('Server error');
+        setBanner('Server error. Please try again.');
       }
     }
   };
@@ -87,17 +91,29 @@ const LoginPage = ({ onLoginSuccess }) => {
     if (regPassword !== regConfirm) return setBanner('Passwords do not match');
     if (!regTerms) return setBanner('Please accept the terms');
     try {
-      await authApi.register({ email: regEmail, password: regPassword, name: regName });
+      const result = await authApi.register({ email: regEmail, password: regPassword, name: regName });
       setVerify({ email: regEmail, token: '' });
       setStage('verify');
-      setBanner('Registered successfully. Please verify your email.');
+      
+      // 根据文档，无论是新注册还是已注册但未验证，都应该进入验证流程
+      if (result?.need_verify) {
+        setBanner('Registration successful. Please verify your email.');
+      } else {
+        setBanner('Please verify your email to complete registration.');
+      }
     } catch (err) {
       if (err.status === 422) {
         setFieldErrors(extractFieldErrors(err.body));
         setBanner('Validation error. Please check the fields.');
       } else if (err.status === 409) {
-        setBanner('This email is already registered. Go to Sign In.');
-        setActiveTab('login');
+        const code = err.body?.code;
+        if (code === 4002) { // email_exists
+          setBanner('This email is already registered. Go to Sign In.');
+          setActiveTab('login');
+        } else {
+          setBanner('This email is already registered. Go to Sign In.');
+          setActiveTab('login');
+        }
       } else {
         setBanner('Server error. Please try again.');
       }
@@ -132,11 +148,26 @@ const LoginPage = ({ onLoginSuccess }) => {
     if (!email) return setBanner('Please enter your email before resending');
     if (USE_AUTH_V1) {
       try {
-        await authApi.resendVerify({ email });
-        setBanner('Verification email sent. Please check your inbox.');
+        const result = await authApi.resendVerify({ email });
+        
+        // 根据API文档处理不同的响应消息
+        if (result?.message === 'already_verified') {
+          setBanner('Your account is already verified. Please go to login.');
+          setActiveTab('login');
+          setStage('auth');
+        } else {
+          setBanner('Verification email sent. Please check your inbox.');
+          if (result?.expires_in_hours) {
+            console.log(`Verification link expires in ${result.expires_in_hours} hours`);
+          }
+        }
       } catch (e) {
-        if (e.status === 429) setBanner('Too many requests. Try again later.'); 
-        else setBanner('Failed to send. Please try again.');
+        if (e.status === 429) {
+          const retryAfter = e.retryAfter || 60;
+          setBanner(`Too many requests. Try again in ${retryAfter} seconds.`);
+        } else {
+          setBanner('Failed to send verification email. Please try again.');
+        }
       }
       return;
     }
@@ -150,14 +181,21 @@ const LoginPage = ({ onLoginSuccess }) => {
       const token = verify.token || 'mock-token-from-link';
       try {
         await authApi.verifyByToken(token);
-        setBanner('Email verified successfully');
+        setBanner('Email verified successfully! Please login to continue.');
         setActiveTab('login');
         setStage('auth');
       } catch (e) {
         const code = e?.body?.code;
-        if (code === 1003) setBanner('Link expired. Please resend verification email.');
-        else if (code === 1004 || code === 1005) setBanner('Invalid or revoked link. Please resend.');
-        else setBanner('Verification failed. Please try again.');
+        // 根据API文档的错误码进行精确处理
+        if (code === 1003) {
+          setBanner('Verification link has expired. Please request a new one.');
+        } else if (code === 1004) {
+          setBanner('Invalid verification link. Please request a new one.');
+        } else if (code === 1005) {
+          setBanner('This verification link has been revoked. Please use the latest link.');
+        } else {
+          setBanner('Verification failed. Please try again or request a new link.');
+        }
       }
       return;
     }

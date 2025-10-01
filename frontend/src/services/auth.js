@@ -65,7 +65,11 @@ export const authApi = {
   async logout() {
     try {
       await request('/api/v1/auth/logout', { method: 'POST' });
-    } catch { /* ignore network errors for logout */ }
+    } catch { 
+      // 根据文档，登出接口无需鉴权，网络错误可以忽略
+      // 不输出多余日志以避免泄露信息
+    }
+    // 清理本地访问令牌（Cookie会通过响应头自动清除）
     setAccessToken(null);
   }
 };

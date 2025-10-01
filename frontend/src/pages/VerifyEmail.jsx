@@ -20,27 +20,48 @@ export default function VerifyEmail() {
       try {
         await authApi.verifyByToken(token);
         setStatus('success');
-        setBanner('Email verified successfully. Please log in.');
+        setBanner('Email verified successfully! You can now login to your account.');
+        
+        // 3秒后自动跳转到登录页
+        setTimeout(() => {
+          navigate('/auth?tab=login');
+        }, 3000);
       } catch (e) {
         setStatus('error');
         const code = e?.body?.code;
-        if (code === 1003) setBanner('Link expired. Please resend.');
-        else if (code === 1004) setBanner('Invalid link. Please resend verification email.');
-        else if (code === 1005) setBanner('This link has been revoked. Please use the latest link.');
-        else setBanner('Verification failed. Please try again.');
+        if (code === 1003) setBanner('Verification link has expired. Please request a new verification email.');
+        else if (code === 1004) setBanner('Invalid verification link. Please request a new verification email.');
+        else if (code === 1005) setBanner('This verification link has been revoked. Please use the latest verification email.');
+        else setBanner('Verification failed. Please try again or request a new verification email.');
       }
     })();
-  }, [token]);
+  }, [token, navigate]);
 
   const resend = async (e) => {
     e.preventDefault();
     if (!email) return setBanner('Please enter your email before resending.');
     try {
-      await authApi.resendVerify({ email });
-      setBanner('Verification email sent. Please check your inbox.');
+      const result = await authApi.resendVerify({ email });
+      
+      // 根据API文档处理不同的响应消息
+      if (result?.message === 'already_verified') {
+        setBanner('Your account is already verified. Please go to login.');
+        setTimeout(() => {
+          navigate('/auth?tab=login');
+        }, 2000);
+      } else {
+        setBanner('Verification email sent. Please check your inbox.');
+        if (result?.expires_in_hours) {
+          console.log(`Verification link expires in ${result.expires_in_hours} hours`);
+        }
+      }
     } catch (e) {
-      if (e.status === 429) setBanner('Too many requests. Please try again later.'); 
-      else setBanner('Failed to send. Please try again.');
+      if (e.status === 429) {
+        const retryAfter = e.retryAfter || 60;
+        setBanner(`Too many requests. Try again in ${retryAfter} seconds.`);
+      } else {
+        setBanner('Failed to send verification email. Please try again.');
+      }
     }
   };
 
@@ -56,7 +77,10 @@ export default function VerifyEmail() {
 
         {status === 'success' && (
           <div className="form">
-            <button onClick={() => navigate('/login')}>Go to Login</button>
+            <button onClick={() => navigate('/auth?tab=login')}>Go to Login</button>
+            <p style={{ marginTop: '1rem', color: '#666', fontSize: '0.9rem' }}>
+              You will be automatically redirected to the login page in 3 seconds...
+            </p>
           </div>
         )}
 
@@ -65,7 +89,7 @@ export default function VerifyEmail() {
             <input type="email" placeholder="Enter your email to resend verification" value={email} onChange={(e)=>setEmail(e.target.value)} required />
             <button type="submit">Resend Verification Email</button>
             <div className="link" style={{ marginTop: 8 }}>
-              <Link to="/login">Back to Login</Link>
+              <Link to="/auth?tab=login">Back to Login</Link>
             </div>
           </form>
         )}
