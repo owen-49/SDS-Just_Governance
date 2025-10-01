@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { sections } from '../data/structure';
+import { sections } from '../constants/structure';
 
 export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onToggleModule, onSelectTopic, currentTopicId, user }) {
   const collapsed = ui?.collapsed;
