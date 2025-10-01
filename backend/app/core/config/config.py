@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # 1. 先找到 backend/.env 读取.env文件内容到系统环境变量
-BACKEND_DIR = Path(__file__).resolve().parents[2]  # → backend/
+BACKEND_DIR = Path(__file__).resolve().parents[3]  # → backend/
 ENV_FILE = BACKEND_DIR / ".env"
 if ENV_FILE.exists():
     load_dotenv(dotenv_path=ENV_FILE, override=False)
@@ -17,8 +17,8 @@ DATABASE_URL_ASYNC = os.getenv("DATABASE_URL_ASYNC")
 DATABASE_URL_SYNC = os.getenv("DATABASE_URL_SYNC")
 ENV = os.getenv("ENV", "dev")  # 默认为dev
         # prompts 目录：可以从环境变量读，如果没有的话就是backend/prompts
-PROMPT_PATH = Path(os.getenv("PROMPTS_DIR") or (BACKEND_DIR / "prompts" / "default.json")).resolve()
-QUESTION_PATH = Path(os.getenv("QUESTION_DIR") or (BACKEND_DIR / "questionnaires" / "questionnaires.json")).resolve()
+PROMPT_PATH = Path(os.getenv("PROMPTS_DIR") or (BACKEND_DIR / "static" / "prompts" / "default.json")).resolve()
+QUESTION_PATH = Path(os.getenv("QUESTION_DIR") or (BACKEND_DIR / "static" / "questionnaires" / "questionnaires.json")).resolve()
 
 # def read_prompt(name: str) -> str:
 #     # 例：read_prompt("questionnaire") 会读 backend/prompts/questionnaire.json

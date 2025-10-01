@@ -3,3 +3,4 @@
 pip-tools
 pipreqs
 pip-chill
+rich

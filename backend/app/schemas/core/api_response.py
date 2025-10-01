@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from core.codes import BizCode
+from core.exceptions.codes import BizCode
 
 
 class ApiResponse(BaseModel):

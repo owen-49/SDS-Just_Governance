@@ -8,7 +8,7 @@ import jwt
 
 from db.session import SessionLocal
 from original_models.user import User
-from services.mail_service import MailService
+from services.old.mail_service import MailService
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("JWT_SECRET", "change_me")

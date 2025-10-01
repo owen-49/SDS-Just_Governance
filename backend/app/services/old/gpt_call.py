@@ -1,15 +1,12 @@
 # GPT interaction logic
 import os
 import json
-from pathlib import Path
-from fastapi import HTTPException
-from dotenv import load_dotenv
 from functools import lru_cache
 
 # OpenAI v1 SDK
 from openai import OpenAI
-from core.config import OPENAI_API_KEY, PROMPT_PATH, OPENAI_MODEL
-from schemas.explain import ExplainOut
+from core.config.config import OPENAI_API_KEY, PROMPT_PATH, OPENAI_MODEL
+from schemas.old.explain import ExplainOut
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY not set in .env")

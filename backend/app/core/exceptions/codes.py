@@ -23,6 +23,7 @@ class BizCode(IntEnum):
     UNAUTHENTICATED = 1001  # 未登录/无凭证 401
     TOKEN_EXPIRED = 1003    # 凭证过期 401
     TOKEN_INVALID = 1004    # 凭证无效/伪造/非法/签名失败 401
+    TOKEN_REVOKED = 1005    # 凭证被撤销
 
     FORBIDDEN = 1002        # 权限不足/策略禁止 403
     FORBIDDEN_ROLE = 1101   #  角色不匹配 403
@@ -45,10 +46,10 @@ class BizCode(IntEnum):
     PRIVATE_RESOURCE = 3003
 
     # 4xxx 业务冲突/状态非法
-    CONFLICT = 4001
-    EMAIL_EXISTS = 4002
-    VERSION_CONFLICT = 4003
-    STATE_INVALID = 4004
+    CONFLICT = 4001     # 业务冲突 -> 409
+    EMAIL_EXISTS = 4002    # 邮箱已存在 -> 409
+    VERSION_CONFLICT = 4003     # 版本冲突 -> 409
+    STATE_INVALID = 4004    #
     ALREADY_DONE = 4005
     PRECONDITION_FAILED = 4006  # ETag/If-* 不满足，常配 412
 
@@ -80,6 +81,7 @@ CODE_META: dict[BizCode, CodeMeta] = {
     BizCode.UNAUTHENTICATED: CodeMeta("unauthenticated", 401),
     BizCode.TOKEN_EXPIRED: CodeMeta("token_expired", 401),
     BizCode.TOKEN_INVALID: CodeMeta("token_invalid", 401),
+    BizCode.TOKEN_REVOKED: CodeMeta("token_revoked", 401),
     BizCode.FORBIDDEN: CodeMeta("forbidden", 403),
     BizCode.FORBIDDEN_ROLE: CodeMeta("forbidden_role", 403),
     BizCode.FEATURE_FLAG_OFF: CodeMeta("feature_flag_off", 403),

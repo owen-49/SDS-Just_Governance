@@ -4,10 +4,10 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.db import get_db
-from core.security import decode_access_token
-from core.exceptions import BizError
-from core.codes import BizCode
+from core.db.db import get_db
+from core.tools.security import decode_access_token
+from core.exceptions.exceptions import BizError
+from core.exceptions.exceptions import BizCode
 
 # 用于提取 Authorization: Bearer <token> 的 Header
 security = HTTPBearer(auto_error=False)
@@ -41,7 +41,7 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db),
         raise HTTPException(401, "unauthenticated", headers={"WWW-Authenticate": "Bearer"})
 
     # 步骤四：加载用户对象
-    from repositories.users import get_user_by_id
+    from repositories.auth.users import get_user_by_id
     user = await get_user_by_id(db, user_id)
     if not user or not getattr(user, "is_active", True):    # 若用户不存在或已经账号已注销：仍然返回401 + 1001（未授权）
         raise HTTPException(401, "unauthenticated", headers={"WWW-Authenticate": "Bearer"})

@@ -57,7 +57,13 @@ class OnboardingSurveyAnswer(Base):
         nullable=False
     )
 
+    # 属于哪个调查
     survey: Mapped["OnboardingSurvey"] = relationship(back_populates="answers")
+    # 有哪些选项
+    options: Mapped[list["OnboardingSurveyOption"]] = relationship(
+        back_populates="answer",
+        cascade="all, delete-orphan"
+    )
 
 class OnboardingSurveyOption(Base):
     __tablename__ = "onboarding_survey_options"

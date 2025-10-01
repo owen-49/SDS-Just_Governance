@@ -1,4 +1,4 @@
-# backend/app/models/user_auth.py
+# backend/app/models/auth.py
 from __future__ import annotations
 import uuid
 from datetime import datetime
