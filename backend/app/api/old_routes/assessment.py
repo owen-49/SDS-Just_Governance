@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, List
 
-from services.questionnaire import load_questionnaire, evaluate_answers
+from services.old.questionnaire import load_questionnaire, evaluate_answers
 
 router = APIRouter(prefix="/assessment", tags=["assessment"])
 

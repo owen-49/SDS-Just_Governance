@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from services.gpt_call import explain_topic, ask_question
+from services.old.gpt_call import explain_topic, ask_question
 
 
 logger = logging.getLogger(__name__)

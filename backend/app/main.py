@@ -1,15 +1,28 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.chat import router as chat_router
-from api.assessment import router as assessment_router
-from api.auth import router as auth_router
-from core.exceptions import setup_exception_handlers
-from core.logging_config import setup_logging
-from core.middleware.access_log import AccessLogMiddleware
-from core.middleware.request_id import RequestIDMiddleware
 
-setup_logging()                 # 先初始化日志
+from api.old_routes.chat import router as chat_router
+from api.old_routes.assessment import router as assessment_router
+from core.exceptions.exceptions import setup_exception_handlers
+from core.logging.logging_config import setup_logging
+from middleware.access_log import AccessLogMiddleware
+from middleware.request_id import RequestIDMiddleware
+
+from api.routes.auth import router as auth_router  # 导入auth模块中的router对象
+
+
+setup_logging(fmt = "pretty")                 # 先初始化日志
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    setup_logging(fmt="pretty")   # 这里执行一次（在 uvicorn 完成自己的配置之后）
+    logging.getLogger(__name__).info("logging configured (lifespan)")
+    yield
 app = FastAPI(title="Just Governance API", version="0.1.0")
+
 
 # 中间件顺序：Request-ID → 访问日志
 app.add_middleware(RequestIDMiddleware)
@@ -41,7 +54,7 @@ def root():
 def healthz():
     return {"status": "ok"}
 
-# AI 路由
-app.include_router(auth_router)
 app.include_router(chat_router, prefix="/ai")
 app.include_router(assessment_router)
+
+app.include_router(auth_router,prefix="/api/v1")

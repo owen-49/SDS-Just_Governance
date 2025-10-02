@@ -5,12 +5,12 @@
 # online 模式	真正连接数据库并执行 migration 操作
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy import pool
 
 from alembic import context
 
-from app.core.config import DATABASE_URL_SYNC
+from core.config.config import DATABASE_URL_SYNC
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
