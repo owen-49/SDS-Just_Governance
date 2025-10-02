@@ -1,47 +1,70 @@
 import React, { useState } from 'react';
 import '../styles/auth.css';
 import { dbApi } from '../services/localDb';
+import { authApi } from '../services/auth';
+
+const USE_AUTH_V1 = process.env.REACT_APP_USE_AUTH_V1 === 'true';
 
 const LoginPage = ({ onLoginSuccess }) => {
   const [activeTab, setActiveTab] = useState('login');
   const [formData, setFormData] = useState({
-    loginEmail: '',
-    loginPassword: '',
-    regEmail: '',
-    regPassword: '',
-    regConfirm: '',
-    regName: '',
-    regTerms: false,
-    forgotEmail: '',
-    resetEmail: '',
-    resetToken: '',
-    resetPassword1: '',
-    resetPassword2: ''
+    email: '',
+    password: '',
+    confirmPassword: '',
+    name: '',
+    terms: false
   });
-  const [stage, setStage] = useState('auth'); // auth | forgot | reset | verify | oauth_profile | oauth_bind
+  const [stage, setStage] = useState('auth'); // auth | verify
   const [banner, setBanner] = useState('');
-  const [verify, setVerify] = useState({ email: '', token: '' });
-  const [oauthCtx, setOauthCtx] = useState(null); // { provider, provider_account_id, email?, user? }
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [verify, setVerify] = useState({ email: '', countdown: 0 });
+  const [oauthCtx, setOauthCtx] = useState({ loading: false, error: '' });
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+  const extractFieldErrors = (errBody) => {
+    // 根据“表单错误处理.md”的规范，data.errors 来自 Pydantic exc.errors()
+    const map = {};
+    const errors = errBody?.data?.errors || [];
+    errors.forEach(item => {
+      const loc = Array.isArray(item.loc) ? item.loc.slice() : [];
+      if (loc[0] === 'body' || loc[0] === 'query' || loc[0] === 'path' || loc[0] === 'header') loc.shift();
+      const key = loc.join('.') || '_';
+      const msg = item.msg || item.type || 'Invalid value';
+      if (!map[key]) map[key] = [];
+      map[key].push(msg);
+    });
+    return map;
   };
 
-  const onLogin = (e) => {
-    e.preventDefault();
-    const { loginEmail, loginPassword } = formData;
-    if (!loginEmail || !loginPassword) return setBanner('Please enter email and password');
+  const onLoginV1 = async (loginEmail, loginPassword) => {
+    setBanner('');
+    setFieldErrors({});
+    try {
+      const result = await authApi.login({ email: loginEmail, password: loginPassword });
+      const me = await authApi.me();
+      
+      // 检查是否需要显示引导
+      // (按文档要求，不在此处自动弹出任何额外UI，前端可在需要时自行触发)
+
+      onLoginSuccess?.(me);
+    } catch (err) {
+      if (err.status === 422) {
+        setFieldErrors(extractFieldErrors(err.body));
+        setBanner('Validation error. Please check the fields.');
+      } else if (err.status === 401) {
+        setBanner('Login failed');
+      } else {
+        setBanner('Server error. Please try again.');
+      }
+    }
+  };
+
+  const onLoginLocal = (loginEmail, loginPassword) => {
     const res = dbApi.login(loginEmail, loginPassword);
     if (!res.ok) {
       if (res.code === 'no_account') setBanner('Account not found · Go to Sign Up');
       else if (res.code === 'wrong_password') setBanner('Incorrect password · Forgot Password?');
       else if (res.code === 'unverified') {
         setBanner('Please verify your email first');
-        // Send verification email and navigate to verification page
         const r = dbApi.createEmailVerificationToken(loginEmail);
         if (r.ok) {
           setVerify({ email: loginEmail, token: r.token });
@@ -53,9 +76,51 @@ const LoginPage = ({ onLoginSuccess }) => {
     onLoginSuccess?.(res.user);
   };
 
-  const onRegister = (e) => {
+  const onLogin = (e) => {
     e.preventDefault();
-    const { regEmail, regPassword, regConfirm, regName, regTerms } = formData;
+    const { loginEmail, loginPassword } = formData;
+    if (!loginEmail || !loginPassword) return setBanner('Please enter email and password');
+    if (USE_AUTH_V1) return onLoginV1(loginEmail, loginPassword);
+    return onLoginLocal(loginEmail, loginPassword);
+  };
+
+  const onRegisterV1 = async (regEmail, regPassword, regConfirm, regName, regTerms) => {
+    setBanner('');
+    setFieldErrors({});
+    if (!regEmail || !regPassword || !regConfirm) return setBanner('Please fill all required fields');
+    if (regPassword !== regConfirm) return setBanner('Passwords do not match');
+    if (!regTerms) return setBanner('Please accept the terms');
+    try {
+      const result = await authApi.register({ email: regEmail, password: regPassword, name: regName });
+      setVerify({ email: regEmail, token: '' });
+      setStage('verify');
+      
+      // 根据文档，无论是新注册还是已注册但未验证，都应该进入验证流程
+      if (result?.need_verify) {
+        setBanner('Registration successful. Please verify your email.');
+      } else {
+        setBanner('Please verify your email to complete registration.');
+      }
+    } catch (err) {
+      if (err.status === 422) {
+        setFieldErrors(extractFieldErrors(err.body));
+        setBanner('Validation error. Please check the fields.');
+      } else if (err.status === 409) {
+        const code = err.body?.code;
+        if (code === 4002) { // email_exists
+          setBanner('This email is already registered. Go to Sign In.');
+          setActiveTab('login');
+        } else {
+          setBanner('This email is already registered. Go to Sign In.');
+          setActiveTab('login');
+        }
+      } else {
+        setBanner('Server error. Please try again.');
+      }
+    }
+  };
+
+  const onRegisterLocal = (regEmail, regPassword, regConfirm, regName, regTerms) => {
     if (!regEmail || !regPassword || !regConfirm) return setBanner('Please fill all required fields');
     if (regPassword !== regConfirm) return setBanner('Passwords do not match');
     if (!regTerms) return setBanner('Please accept the terms');
@@ -65,22 +130,75 @@ const LoginPage = ({ onLoginSuccess }) => {
       setActiveTab('login');
       return;
     }
-    // Registration successful → send verification email and redirect to verification page
     const r = dbApi.createEmailVerificationToken(regEmail);
     if (r.ok) setVerify({ email: regEmail, token: r.token });
     setBanner('Verify your email · A verification link has been sent');
     setStage('verify');
   };
 
-  const onResendVerify = () => {
+  const onRegister = (e) => {
+    e.preventDefault();
+    const { regEmail, regPassword, regConfirm, regName, regTerms } = formData;
+    if (USE_AUTH_V1) return onRegisterV1(regEmail, regPassword, regConfirm, regName, regTerms);
+    return onRegisterLocal(regEmail, regPassword, regConfirm, regName, regTerms);
+  };
+
+  const onResendVerify = async () => {
     const email = verify.email || formData.regEmail || formData.loginEmail;
-    if (!email) return setBanner('Enter your email then resend');
+    if (!email) return setBanner('Please enter your email before resending');
+    if (USE_AUTH_V1) {
+      try {
+        const result = await authApi.resendVerify({ email });
+        
+        // 根据API文档处理不同的响应消息
+        if (result?.message === 'already_verified') {
+          setBanner('Your account is already verified. Please go to login.');
+          setActiveTab('login');
+          setStage('auth');
+        } else {
+          setBanner('Verification email sent. Please check your inbox.');
+          if (result?.expires_in_hours) {
+            console.log(`Verification link expires in ${result.expires_in_hours} hours`);
+          }
+        }
+      } catch (e) {
+        if (e.status === 429) {
+          const retryAfter = e.retryAfter || 60;
+          setBanner(`Too many requests. Try again in ${retryAfter} seconds.`);
+        } else {
+          setBanner('Failed to send verification email. Please try again.');
+        }
+      }
+      return;
+    }
     const r = dbApi.createEmailVerificationToken(email);
     if (r.ok) setVerify({ email, token: r.token });
     setBanner('Verification email resent');
   };
 
-  const onDoVerify = () => {
+  const onDoVerify = async () => {
+    if (USE_AUTH_V1) {
+      const token = verify.token || 'mock-token-from-link';
+      try {
+        await authApi.verifyByToken(token);
+        setBanner('Email verified successfully! Please login to continue.');
+        setActiveTab('login');
+        setStage('auth');
+      } catch (e) {
+        const code = e?.body?.code;
+        // 根据API文档的错误码进行精确处理
+        if (code === 1003) {
+          setBanner('Verification link has expired. Please request a new one.');
+        } else if (code === 1004) {
+          setBanner('Invalid verification link. Please request a new one.');
+        } else if (code === 1005) {
+          setBanner('This verification link has been revoked. Please use the latest link.');
+        } else {
+          setBanner('Verification failed. Please try again or request a new link.');
+        }
+      }
+      return;
+    }
     if (!verify.token || !verify.email) return setBanner('Missing verification link');
     const r = dbApi.consumeEmailVerificationToken(verify.token);
     if (!r.ok) return setBanner('Link expired · Resend verification email');
@@ -94,9 +212,17 @@ const LoginPage = ({ onLoginSuccess }) => {
     setStage('auth');
   };
 
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
   const onForgot = (e) => {
     e.preventDefault();
-    if (!formData.forgotEmail) return setBanner('Please enter email');
+    if (!formData.forgotEmail) return setBanner('Please enter your email');
     const { token } = dbApi.forgotPassword(formData.forgotEmail);
     setBanner('Reset email sent');
     setFormData(f => ({ ...f, resetEmail: formData.forgotEmail, resetToken: token }));
@@ -106,10 +232,10 @@ const LoginPage = ({ onLoginSuccess }) => {
   const onReset = (e) => {
     e.preventDefault();
     const { resetEmail, resetToken, resetPassword1, resetPassword2 } = formData;
-    if (!resetPassword1 || !resetPassword2) return setBanner('Enter new password');
+    if (!resetPassword1 || !resetPassword2) return setBanner('Please enter new password');
     if (resetPassword1 !== resetPassword2) return setBanner('Passwords do not match');
     const r = dbApi.resetPassword(resetEmail, resetToken, resetPassword1);
-    if (!r.ok) return setBanner('Reset link expired · Resend');
+    if (!r.ok) return setBanner('Reset link expired. Please resend.');
     setBanner('Password reset successfully');
     setStage('auth');
     setActiveTab('login');
@@ -158,15 +284,20 @@ const LoginPage = ({ onLoginSuccess }) => {
             banner.includes('expired') || 
             banner.includes('not completed') || 
             banner.includes('failed') || 
+            banner.includes('Failed') ||
             banner.includes('Missing') || 
             banner.includes('do not match') || 
             banner.includes('already registered') || 
-            banner.includes('accept the terms')
+            banner.includes('accept the terms') ||
+            banner.includes('error') ||
+            banner.includes('Invalid') ||
+            banner.includes('revoked')
               ? 'error' 
               : banner.includes('successfully') || 
                 banner.includes('verified') || 
                 banner.includes('resent') || 
-                banner.includes('sent')
+                banner.includes('sent') ||
+                banner.includes('Registered')
               ? 'success' 
               : ''
           }`}>
@@ -194,7 +325,9 @@ const LoginPage = ({ onLoginSuccess }) => {
             {activeTab === 'login' && (
               <form onSubmit={onLogin} className="form">
                 <input type="email" name="loginEmail" value={formData.loginEmail} onChange={handleInputChange} placeholder="Email" required />
+                {fieldErrors['email'] && <div className="field-error">{fieldErrors['email'].join('\n')}</div>}
                 <input type="password" name="loginPassword" value={formData.loginPassword} onChange={handleInputChange} placeholder="Password" required />
+                {fieldErrors['password'] && <div className="field-error">{fieldErrors['password'].join('\n')}</div>}
                 <button type="submit">Sign In</button>
                 
                 {/* Quick test login */}
@@ -203,6 +336,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                   <button 
                     type="button" 
                     onClick={() => {
+                      // 本地测试账号登录逻辑保留
                       const res = dbApi.createTestAccountsAndLogin();
                       if (res.ok) onLoginSuccess?.(res.user);
                     }}
@@ -222,9 +356,12 @@ const LoginPage = ({ onLoginSuccess }) => {
             {activeTab === 'register' && (
               <form onSubmit={onRegister} className="form">
                 <input type="email" name="regEmail" value={formData.regEmail} onChange={handleInputChange} placeholder="Email" required />
+                {fieldErrors['email'] && <div className="field-error">{fieldErrors['email'].join('\n')}</div>}
                 <input type="password" name="regPassword" value={formData.regPassword} onChange={handleInputChange} placeholder="Password" required />
+                {fieldErrors['password'] && <div className="field-error">{fieldErrors['password'].join('\n')}</div>}
                 <input type="password" name="regConfirm" value={formData.regConfirm} onChange={handleInputChange} placeholder="Confirm Password" required />
-                <input type="text" name="regName" value={formData.regName} onChange={handleInputChange} placeholder="Name (Yes please)" />
+                <input type="text" name="regName" value={formData.regName} onChange={handleInputChange} placeholder="Name (optional)" />
+                {fieldErrors['name'] && <div className="field-error">{fieldErrors['name'].join('\n')}</div>}
                 <label className="checkbox-label">
                   <input type="checkbox" name="regTerms" checked={formData.regTerms} onChange={handleInputChange} />
                   I accept the terms

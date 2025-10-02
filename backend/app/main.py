@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from api.old_routes.chat import router as chat_router
 from api.old_routes.assessment import router as assessment_router
 from core.exceptions.exceptions import setup_exception_handlers
