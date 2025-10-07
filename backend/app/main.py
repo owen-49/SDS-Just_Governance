@@ -12,6 +12,8 @@ from middleware.access_log import AccessLogMiddleware
 from middleware.request_id import RequestIDMiddleware
 
 from api.routes.auth import router as auth_router  # 导入auth模块中的router对象
+from api.routes.onboarding import router as onboarding_router
+
 
 
 setup_logging(fmt = "pretty")                 # 先初始化日志
@@ -58,3 +60,5 @@ app.include_router(chat_router, prefix="/ai")
 app.include_router(assessment_router)
 
 app.include_router(auth_router,prefix="/api/v1")
+
+app.include_router(onboarding_router)
