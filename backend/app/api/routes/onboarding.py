@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.db.db import get_db
-from deps.auth import get_current_user
+from app.core.db.db import get_db
+from app.deps.auth import get_current_user
 
-from schemas.api_response import ApiResponse, ok, fail
+from app.schemas.api_response import ApiResponse, ok, fail
 
-from schemas.onboarding import SubmitPayload, SubmitResult
-from services.old.onboarding import calculate_score
-from repositories.onboarding import get_user_survey, create_full_survey
+from app.schemas.onboarding import SubmitPayload, SubmitResult
+from app.services.old.onboarding import calculate_score
+from app.repositories.onboarding import get_user_survey, create_full_survey
 
 router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
 

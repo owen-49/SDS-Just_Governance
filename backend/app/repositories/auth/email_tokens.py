@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import EmailVerifyToken
+from app.models import EmailVerifyToken
 
 # 创建一个email_token：
 #   设置用户id，token哈希值，过期时间

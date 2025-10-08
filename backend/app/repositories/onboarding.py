@@ -2,8 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 from typing import Iterable
-from models import OnboardingSurvey, OnboardingSurveyAnswer, OnboardingSurveyOption
-from schemas.onboarding import AnswerItem
+from app.models import OnboardingSurvey, OnboardingSurveyAnswer, OnboardingSurveyOption
+from app.schemas.onboarding import AnswerItem
 
 async def get_user_survey(session: AsyncSession, user_id):
     q = select(OnboardingSurvey).where(OnboardingSurvey.user_id == user_id)

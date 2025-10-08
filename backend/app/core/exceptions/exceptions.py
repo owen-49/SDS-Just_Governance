@@ -26,10 +26,10 @@ from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
 # 复用已有的响应壳
-from schemas.core.api_response import fail
+from app.schemas.core.api_response import fail
 
 # 码表与映射（单一事实源）
-from core.exceptions.codes import BizCode, default_biz_for_http, label_for, CODE_TO_HTTP_HINT
+from app.core.exceptions.codes import BizCode, default_biz_for_http, label_for, CODE_TO_HTTP_HINT
 
 logger = logging.getLogger(__name__)
 

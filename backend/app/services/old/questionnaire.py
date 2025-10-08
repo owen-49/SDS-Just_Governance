@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import Dict, List
 
 from fastapi import HTTPException
-from core.config.config import QUESTION_PATH
+from app.core.config.config import QUESTION_PATH
 
 
 # Path to questionnaire definitions

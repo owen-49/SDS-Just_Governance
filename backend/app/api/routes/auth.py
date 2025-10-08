@@ -6,21 +6,21 @@ from fastapi import APIRouter, Request, Response, Depends, Cookie, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
-from core.db.db import get_db
-from core.tools.email_verify import gen_email_token_pair, build_verify_link, send_verification_email, EMAIL_TOKEN_TTL_HOURS, \
+from app.core.db.db import get_db
+from app.core.tools.email_verify import gen_email_token_pair, build_verify_link, send_verification_email, EMAIL_TOKEN_TTL_HOURS, \
     hash_email_token
-from repositories.auth.email_tokens import revoke_unusued_tokens_of_user, create_email_token, get_token_by_hash
-from schemas.core.api_response import ok
-from schemas.auth.auth import RegisterIn, LoginIn, TokenOut, ResendIn
-from core.tools.security import (
+from app.repositories.auth.email_tokens import revoke_unusued_tokens_of_user, create_email_token, get_token_by_hash
+from app.schemas.core.api_response import ok
+from app.schemas.auth.auth import RegisterIn, LoginIn, TokenOut, ResendIn
+from app.core.tools.security import (
     hash_password, verify_password, create_access_token,
     new_refresh_token_pair, hash_refresh_token, refresh_expiry_from_now
 )
-from core.exceptions.exceptions import BizError
-from core.exceptions.exceptions import BizCode
-from models import User
-from models import UserSession
-from deps.auth import get_current_user
+from app.core.exceptions.exceptions import BizError
+from app.core.exceptions.exceptions import BizCode
+from app.models import User
+from app.models import UserSession
+from app.deps.auth import get_current_user
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])

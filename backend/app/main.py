@@ -4,15 +4,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.old_routes.chat import router as chat_router
-from api.old_routes.assessment import router as assessment_router
-from core.exceptions.exceptions import setup_exception_handlers
-from core.logging.logging_config import setup_logging
-from middleware.access_log import AccessLogMiddleware
-from middleware.request_id import RequestIDMiddleware
+from app.api.old_routes.chat import router as chat_router
+from app.api.old_routes.assessment import router as assessment_router
+from app.core.exceptions.exceptions import setup_exception_handlers
+from app.core.logging.logging_config import setup_logging
+from app.middleware.access_log import AccessLogMiddleware
+from app.middleware.request_id import RequestIDMiddleware
 
-from api.routes.auth import router as auth_router  # 导入auth模块中的router对象
-from api.routes.onboarding import router as onboarding_router
+from app.api.routes.auth import router as auth_router  # 导入auth模块中的router对象
+from app.api.routes.onboarding import router as onboarding_router
 
 
 

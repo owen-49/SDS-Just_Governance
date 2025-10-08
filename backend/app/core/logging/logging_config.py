@@ -73,7 +73,7 @@ def setup_logging(level: int = logging.INFO, fmt:str | None = None) -> None:
     # 若选择使用友好输出格式：
     if fmt == "pretty":
         # 彩色、带高亮堆栈
-        from core.logging.rich_extra_handler import ExtraRichHandler
+        from app.core.logging.rich_extra_handler import ExtraRichHandler
 
         # # 让所有未捕获异常也用彩色回溯
         # install(

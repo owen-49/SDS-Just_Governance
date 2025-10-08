@@ -5,8 +5,8 @@ from functools import lru_cache
 
 # OpenAI v1 SDK
 from openai import OpenAI
-from core.config.config import OPENAI_API_KEY, PROMPT_PATH, OPENAI_MODEL
-from schemas.old.explain import ExplainOut
+from app.core.config.config import OPENAI_API_KEY, PROMPT_PATH, OPENAI_MODEL
+from app.schemas.old.explain import ExplainOut
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY not set in .env")

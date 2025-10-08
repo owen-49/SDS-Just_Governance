@@ -4,10 +4,10 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.db.db import get_db
-from core.tools.security import decode_access_token
-from core.exceptions.exceptions import BizError
-from core.exceptions.exceptions import BizCode
+from app.core.db.db import get_db
+from app.core.tools.security import decode_access_token
+from app.core.exceptions.exceptions import BizError
+from app.core.exceptions.exceptions import BizCode
 
 # 用于提取 Authorization: Bearer <token> 的 Header
 security = HTTPBearer(auto_error=False)

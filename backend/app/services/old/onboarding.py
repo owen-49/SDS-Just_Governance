@@ -1,5 +1,5 @@
 from typing import Iterable, Tuple
-from schemas.onboarding import AnswerItem
+from app.schemas.onboarding import AnswerItem
 
 SCORE_RULES = {
     "confidence_in_boards": {"very_confident": 3, "somewhat_confident": 2, "not_confident": 1},
