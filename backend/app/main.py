@@ -13,16 +13,19 @@ from app.middleware.request_id import RequestIDMiddleware
 
 from app.api.routes.auth import router as auth_router  # 导入auth模块中的router对象
 from app.api.routes.onboarding import router as onboarding_router
+from app.api.routes.assessment import router as assessment_router
 
 
+setup_logging(fmt="pretty")  # 先初始化日志
 
-setup_logging(fmt = "pretty")                 # 先初始化日志
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    setup_logging(fmt="pretty")   # 这里执行一次（在 uvicorn 完成自己的配置之后）
+    setup_logging(fmt="pretty")  # 这里执行一次（在 uvicorn 完成自己的配置之后）
     logging.getLogger(__name__).info("logging configured (lifespan)")
     yield
+
+
 app = FastAPI(title="Just Governance API", version="0.1.0")
 
 
@@ -40,6 +43,7 @@ app.add_middleware(
 # 全局异常处理（兜底 + 统一响应）
 setup_exception_handlers(app)
 
+
 # ✅ 根路由：欢迎信息 + 文档入口
 @app.get("/")
 def root():
@@ -48,17 +52,21 @@ def root():
         "service": "Just Governance API",
         "docs": "http://127.0.0.1:8000/docs",
         "redoc": "http://127.0.0.1:8000/redoc",
-        "healthz": "http://127.0.0.1:8000/healthz"
+        "healthz": "http://127.0.0.1:8000/healthz",
     }
+
 
 # 健康检查（可选）
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
 
+
 app.include_router(chat_router, prefix="/ai")
 app.include_router(assessment_router)
 
-app.include_router(auth_router,prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 app.include_router(onboarding_router)
+
+app.include_router(assessment_router)

@@ -15,16 +15,23 @@ from app.models import User
 from app.schemas.core.api_response import ok, fail
 from app.core.exceptions.exceptions import BizError, BizCode
 
-# TODO: 待实现的 schemas 和 services
-# from app.schemas.assessment import (
-#     QuizPendingOut, QuizSubmitIn, QuizSubmitOut,
-#     AssessmentStartIn, AssessmentStartOut,
-#     AnswerSaveIn, AnswerSaveOut,
-#     AssessmentSubmitOut, AssessmentHistoryOut,
-#     AssessmentDetailOut
-# )
-# from app.services.quiz_service import QuizService
-# from app.services.assessment_service import AssessmentService
+# 导入 Schemas
+from app.schemas.assessment import (
+    QuizPendingOut,
+    QuizSubmitIn,
+    QuizSubmitOut,
+    AssessmentStartIn,
+    AssessmentStartOut,
+    AnswerSaveIn,
+    AnswerSaveOut,
+    AssessmentSubmitOut,
+    AssessmentHistoryOut,
+    AssessmentDetailOut,
+)
+
+# 导入 Services
+from app.services.old.quiz_service import QuizService
+from app.services.old.assessment_service import AssessmentService
 
 router = APIRouter(prefix="/api/v1", tags=["assessment"])
 
@@ -34,7 +41,7 @@ router = APIRouter(prefix="/api/v1", tags=["assessment"])
 # ========================================
 
 
-@router.post("/topics/{topic_id}/quiz/pending")
+@router.post("/topics/{topic_id}/quiz/pending", response_model=QuizPendingOut)
 async def get_or_create_quiz_pending(
     topic_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -59,11 +66,13 @@ async def get_or_create_quiz_pending(
         "quiz_state": "pending",
         "questions": [
           {
+            "item_id": "uuid",
             "order_no": 1,
-            "question_id": "uuid",
-            "qtype": "single",
-            "stem": "What is corporate governance?",
-            "choices": ["A. ...", "B. ...", "C. ...", "D. ..."]
+            "snapshot": {
+              "qtype": "single",
+              "stem": "What is corporate governance?",
+              "choices": ["A. ...", "B. ...", "C. ...", "D. ..."]
+            }
           }
         ]
       }
@@ -73,25 +82,28 @@ async def get_or_create_quiz_pending(
     **错误码：**
     - 401: 未登录
     - 404: 主题不存在
+    - 400: 题库题目不足
     """
-    # TODO: 实现逻辑
-    # quiz_service = QuizService(db)
-    # result = await quiz_service.get_or_create_pending_quiz(
-    #     user_id=current_user.id,
-    #     topic_id=topic_id
-    # )
-    # return ok(data=result)
+    quiz_service = QuizService(db)
 
-    # 临时占位返回
-    return ok(
-        data={"topic_id": str(topic_id), "quiz_state": "pending", "questions": []}
-    )
+    try:
+        result = await quiz_service.get_or_create_pending_quiz(
+            user_id=current_user.id,
+            topic_id=topic_id,
+            question_count=5,  # 可以从配置读取
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
 
 
-@router.post("/topics/{topic_id}/quiz/submit")
+@router.post("/topics/{topic_id}/quiz/submit", response_model=QuizSubmitOut)
 async def submit_topic_quiz(
     topic_id: UUID,
-    # payload: QuizSubmitIn,  # TODO: 使用真实schema
+    payload: QuizSubmitIn,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -129,19 +141,18 @@ async def submit_topic_quiz(
         "total_score": 85.0,
         "items": [
           {
+            "item_id": "uuid",
             "order_no": 1,
+            "snapshot": {...},
+            "your_answer": "B",
             "is_correct": true,
             "correct_answer": "B",
-            "explanation": "Corporate governance ensures..."
-          },
-          {
-            "order_no": 2,
-            "is_correct": false,
-            "correct_answer": "D",
-            "explanation": "The primary duty is..."
+            "explanation": "Corporate governance ensures...",
+            "score": 1.0
           }
         ],
-        "can_mark_complete": true
+        "can_mark_complete": true,
+        "threshold": 80.0
       }
     }
     ```
@@ -152,23 +163,18 @@ async def submit_topic_quiz(
     - 409: pending_quiz不存在或已完成（conflict）
     - 422: 答案格式错误
     """
-    # TODO: 实现逻辑
-    # quiz_service = QuizService(db)
-    # result = await quiz_service.submit_and_grade(
-    #     user_id=current_user.id,
-    #     topic_id=topic_id,
-    #     answers=payload.answers
-    # )
-    # return ok(data=result)
+    quiz_service = QuizService(db)
 
-    return ok(
-        data={
-            "session_id": "temp-uuid",
-            "total_score": 0.0,
-            "items": [],
-            "can_mark_complete": False,
-        }
-    )
+    try:
+        result = await quiz_service.submit_and_grade(
+            user_id=current_user.id, topic_id=topic_id, answers=payload.answers
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
 
 
 # ========================================
@@ -176,9 +182,9 @@ async def submit_topic_quiz(
 # ========================================
 
 
-@router.post("/assessments/global/start")
+@router.post("/assessments/global/start", response_model=AssessmentStartOut)
 async def start_global_assessment(
-    # payload: AssessmentStartIn = None,  # TODO: 可选配置
+    payload: Optional[AssessmentStartIn] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -188,8 +194,8 @@ async def start_global_assessment(
     **请求体（可选）：**
     ```json
     {
-      "difficulty": "mixed",  // beginner|intermediate|advanced|mixed
-      "count": 20             // 题目数量，默认20
+      "difficulty": "mixed",
+      "count": 20
     }
     ```
 
@@ -231,28 +237,24 @@ async def start_global_assessment(
     - 401: 未登录
     - 409: 用户已有未提交的global会话（可选约束）
     """
-    # TODO: 实现逻辑
-    # assessment_service = AssessmentService(db)
-    # result = await assessment_service.start_global_assessment(
-    #     user_id=current_user.id,
-    #     config=payload
-    # )
-    # return ok(data=result)
+    assessment_service = AssessmentService(db)
 
-    return ok(
-        data={
-            "session_id": "temp-uuid",
-            "started_at": "2025-01-15T10:00:00Z",
-            "items": [],
-            "progress": {"total": 20, "answered": 0, "last_question_index": 0},
-        }
-    )
+    try:
+        result = await assessment_service.start_global_assessment(
+            user_id=current_user.id, config=payload
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
 
 
-@router.post("/assessments/{session_id}/answer")
+@router.post("/assessments/{session_id}/answer", response_model=AnswerSaveOut)
 async def save_answer(
     session_id: UUID,
-    # payload: AnswerSaveIn,  # TODO: {item_id, answer, last_question_index?}
+    payload: AnswerSaveIn,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -262,9 +264,9 @@ async def save_answer(
     **请求体示例：**
     ```json
     {
-      "item_id": "uuid",        // 或用 order_no 定位
+      "item_id": "uuid",
       "answer": "B",
-      "last_question_index": 3  // 可选：同步更新进度
+      "last_question_index": 3
     }
     ```
 
@@ -298,26 +300,21 @@ async def save_answer(
     - 409: 会话已提交（不可再答题）
     - 422: 答案格式错误
     """
-    # TODO: 实现逻辑
-    # assessment_service = AssessmentService(db)
-    # result = await assessment_service.save_answer(
-    #     session_id=session_id,
-    #     user_id=current_user.id,
-    #     item_id=payload.item_id,
-    #     answer=payload.answer,
-    #     last_question_index=payload.last_question_index
-    # )
-    # return ok(data=result)
+    assessment_service = AssessmentService(db)
 
-    return ok(
-        data={
-            "saved": True,
-            "progress": {"answered": 0, "total": 20, "last_question_index": 0},
-        }
-    )
+    try:
+        result = await assessment_service.save_answer(
+            session_id=session_id, user_id=current_user.id, payload=payload
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
 
 
-@router.post("/assessments/{session_id}/submit")
+@router.post("/assessments/{session_id}/submit", response_model=AssessmentSubmitOut)
 async def submit_global_assessment(
     session_id: UUID,
     force: bool = Query(False, description="强制提交（有未答题时）"),
@@ -348,22 +345,16 @@ async def submit_global_assessment(
           {
             "topic_id": "uuid",
             "topic_name": "Governance Basics",
-            "score": 85.0
-          },
-          {
-            "topic_id": "uuid",
-            "topic_name": "Legal Framework",
-            "score": 80.0
+            "score": 85.0,
+            "correct": 17,
+            "total": 20
           }
         ],
-        "ai_summary": "You demonstrated strong understanding of governance principles...",
+        "ai_summary": "You demonstrated strong understanding...",
         "ai_recommendation": {
           "level": "intermediate",
           "focus_topics": ["uuid1", "uuid2"],
-          "suggested_actions": [
-            "Review fiduciary duties in depth",
-            "Practice case studies on conflict of interest"
-          ]
+          "suggested_actions": ["Review fiduciary duties..."]
         },
         "submitted_at": "2025-01-15T11:30:00Z"
       }
@@ -377,28 +368,21 @@ async def submit_global_assessment(
     - 409: 会话已提交（重复提交）
     - 422: 有未答题且未设置force=true
     """
-    # TODO: 实现逻辑
-    # assessment_service = AssessmentService(db)
-    # result = await assessment_service.submit_and_finalize(
-    #     session_id=session_id,
-    #     user_id=current_user.id,
-    #     force=force
-    # )
-    # return ok(data=result)
+    assessment_service = AssessmentService(db)
 
-    return ok(
-        data={
-            "session_id": str(session_id),
-            "total_score": 0.0,
-            "breakdown": [],
-            "ai_summary": None,
-            "ai_recommendation": None,
-            "submitted_at": "2025-01-15T11:30:00Z",
-        }
-    )
+    try:
+        result = await assessment_service.submit_and_finalize(
+            session_id=session_id, user_id=current_user.id, force=force
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
 
 
-@router.get("/assessments/history")
+@router.get("/assessments/history", response_model=AssessmentHistoryOut)
 async def get_assessment_history(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50),
@@ -433,14 +417,6 @@ async def get_assessment_history(
             "submitted_at": "2025-01-15T11:30:00Z",
             "total_score": 82.5,
             "question_count": 20
-          },
-          {
-            "session_id": "uuid",
-            "kind": "global",
-            "started_at": "2025-01-10T14:00:00Z",
-            "submitted_at": "2025-01-10T15:20:00Z",
-            "total_score": 78.0,
-            "question_count": 20
           }
         ],
         "pagination": {
@@ -456,24 +432,21 @@ async def get_assessment_history(
     **错误码：**
     - 401: 未登录
     """
-    # TODO: 实现逻辑
-    # assessment_service = AssessmentService(db)
-    # result = await assessment_service.get_user_history(
-    #     user_id=current_user.id,
-    #     page=page,
-    #     limit=limit
-    # )
-    # return ok(data=result)
+    assessment_service = AssessmentService(db)
 
-    return ok(
-        data={
-            "items": [],
-            "pagination": {"page": 1, "limit": 10, "total": 0, "total_pages": 0},
-        }
-    )
+    try:
+        result = await assessment_service.get_user_history(
+            user_id=current_user.id, page=page, limit=limit
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
 
 
-@router.get("/assessments/{session_id}")
+@router.get("/assessments/{session_id}", response_model=AssessmentDetailOut)
 async def get_assessment_detail(
     session_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -517,26 +490,14 @@ async def get_assessment_detail(
               "choices": ["A. ...", "B. ...", "C. ...", "D. ..."]
             },
             "response": {
-              "answer": "B",
+              "item_id": "uuid",
+              "order_no": 1,
+              "snapshot": {...},
+              "your_answer": "B",
               "is_correct": true,
               "correct_answer": "B",
               "explanation": "The board's primary role is...",
               "score": 1.0
-            }
-          },
-          {
-            "order_no": 2,
-            "snapshot": {
-              "qtype": "multi",
-              "stem": "Which are fiduciary duties?",
-              "choices": ["A. ...", "B. ...", "C. ...", "D. ..."]
-            },
-            "response": {
-              "answer": "A,C",
-              "is_correct": false,
-              "correct_answer": "A,B,C",
-              "explanation": "Fiduciary duties include...",
-              "score": 0.5
             }
           }
         ]
@@ -549,25 +510,15 @@ async def get_assessment_detail(
     - 403: 无权访问他人会话
     - 404: 会话不存在或未提交
     """
-    # TODO: 实现逻辑
-    # assessment_service = AssessmentService(db)
-    # result = await assessment_service.get_session_detail(
-    #     session_id=session_id,
-    #     user_id=current_user.id
-    # )
-    # return ok(data=result)
+    assessment_service = AssessmentService(db)
 
-    return ok(
-        data={
-            "session": {
-                "session_id": str(session_id),
-                "kind": "global",
-                "started_at": "2025-01-15T10:00:00Z",
-                "submitted_at": None,
-                "total_score": None,
-                "ai_summary": None,
-                "ai_recommendation": None,
-            },
-            "items": [],
-        }
-    )
+    try:
+        result = await assessment_service.get_session_detail(
+            session_id=session_id, user_id=current_user.id
+        )
+        return ok(data=result.model_dump())
+    except BizError:
+        raise
+    except Exception as e:
+        # 记录日志
+        raise BizError(500, BizCode.INTERNAL_ERROR, "internal_error")
