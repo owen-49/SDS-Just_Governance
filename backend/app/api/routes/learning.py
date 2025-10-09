@@ -65,6 +65,47 @@ def _datetime_to_iso(value: datetime | None) -> str | None:
         value = value.astimezone(timezone.utc)
     return value.isoformat()
 
+def _normalize_resources(resources: Any) -> list[dict[str, Any]]:
+    """Ensure topic resources are always rendered as a list of {title, url}."""
+
+    if not resources:
+        return []
+
+    normalized: list[dict[str, Any]] = []
+
+    if isinstance(resources, dict):
+        for title, value in resources.items():
+            if isinstance(value, dict):
+                url = value.get("url") or value.get("href")
+                label = value.get("title") or value.get("label") or title
+            else:
+                url = value
+                label = title
+            if not url:
+                continue
+            normalized.append({"title": label, "url": url})
+        return normalized
+
+    if isinstance(resources, list):
+        for idx, item in enumerate(resources, start=1):
+            if isinstance(item, dict):
+                url = item.get("url") or item.get("href")
+                title = item.get("title") or item.get("label") or f"Resource {idx}"
+            elif isinstance(item, str):
+                url = item
+                title = item
+            else:
+                continue
+            if not url:
+                continue
+            normalized.append({"title": title, "url": url})
+        return normalized
+
+    if isinstance(resources, str):
+        return [{"title": resources, "url": resources}]
+
+    return normalized
+
 
 @router.get("/boards")
 async def list_boards(
@@ -265,7 +306,7 @@ async def get_topic_content(
         "body_format": content.body_format,
         "body_markdown": content.body_markdown,
         "summary": content.summary,
-        "resources": content.resources or [],
+        "resources":_normalize_resources(content.resources),
     }
     return ok(data=data, request=request)
 

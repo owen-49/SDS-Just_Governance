@@ -4,6 +4,8 @@
 #
 #    pip-compile --cert=None --client-cert=None --index-url=None --output-file=dev.txt --pip-args=None dev.in
 #
+aiosqlite==0.20.0
+    # via -r base.in
 alembic==1.16.5
     # via -r base.in
 annotated-types==0.7.0
