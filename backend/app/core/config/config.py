@@ -2,6 +2,7 @@
 # config.py:  read all environment variables from backend/.env
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # 1. 先找到 backend/.env 读取.env文件内容到系统环境变量
@@ -19,6 +20,26 @@ ENV = os.getenv("ENV", "dev")  # 默认为dev
         # prompts 目录：可以从环境变量读，如果没有的话就是backend/prompts
 PROMPT_PATH = Path(os.getenv("PROMPTS_DIR") or (BACKEND_DIR / "static" / "prompts" / "default.json")).resolve()
 QUESTION_PATH = Path(os.getenv("QUESTION_DIR") or (BACKEND_DIR / "static" / "questionnaires" / "questionnaires.json")).resolve()
+
+
+def _split_env_list(value: str | None) -> list[str]:
+    """Parse comma separated environment variables into a clean list."""
+
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://0.0.0.0:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://0.0.0.0:5173",
+]
+
+CORS_ORIGINS = _split_env_list(os.getenv("CORS_ORIGINS")) or DEFAULT_CORS_ORIGINS
 
 # def read_prompt(name: str) -> str:
 #     # 例：read_prompt("questionnaire") 会读 backend/prompts/questionnaire.json

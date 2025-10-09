@@ -9,6 +9,7 @@ from app.api.old_routes.chat import router as chat_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.learning import router as learning_router
 from app.api.routes.onboarding import router as onboarding_router
+from app.core.config.config import CORS_ORIGINS
 from app.core.exceptions.exceptions import setup_exception_handlers
 from app.core.logging.logging_config import setup_logging
 from app.middleware.access_log import AccessLogMiddleware
@@ -33,10 +34,20 @@ app = FastAPI(title="Just Governance API", version="0.1.0", lifespan=lifespan)
 # middlewares
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(AccessLogMiddleware)
+_cors_allow_origins = [origin for origin in CORS_ORIGINS if origin != "*"]
+_cors_allow_origin_regex = None
+_cors_allow_credentials = True
+
+if "*" in CORS_ORIGINS and not _cors_allow_origins:
+    # Allow all origins without credentials when wildcard is explicitly requested.
+    _cors_allow_origin_regex = ".*"
+    _cors_allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # 按需调整
-    allow_credentials=True,
+    allow_origins=_cors_allow_origins,
+    allow_origin_regex=_cors_allow_origin_regex,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
