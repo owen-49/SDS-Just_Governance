@@ -2,6 +2,7 @@
 from .base import Base
 from .user_auth import User, OAuthAccount, EmailVerifyToken, PasswordResetToken
 from .content import Board, Module, Topic, TopicContent
+from .progress import UserTopicProgress
 from .chat import ChatSession, ChatMessage
 from .assessment import Question, QuestionTopic, AssessmentSession, AssessmentItem
 from .documents import Document, DocumentChunk
@@ -12,6 +13,7 @@ __all__ = [
     "Base",
     "User", "OAuthAccount", "EmailVerifyToken", "PasswordResetToken",
     "Board", "Module", "Topic", "TopicContent",
+    "UserTopicProgress",
     "ChatSession", "ChatMessage",
     "Question", "QuestionTopic", "AssessmentSession", "AssessmentItem",
     "Document", "DocumentChunk",
