@@ -222,6 +222,8 @@ function TopicPage({ topicId, email, onBack }) {
 // TopicChat Component - handles topic-specific conversations
 function TopicChat({ topicId, email, chat, setChat }) {
   const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [currentTypingText, setCurrentTypingText] = useState('');
 
   const send = async () => {
     const text = input.trim();
@@ -231,6 +233,10 @@ function TopicChat({ topicId, email, chat, setChat }) {
     setChat(prev => ({ ...prev, messages: [...prev.messages, userMsg] }));
     setInput('');
 
+    // Show "AI is thinking..." prompt
+    setIsTyping(true);
+    setCurrentTypingText('');
+
     try {
       const response = await aiAsk({
         module_id: topicId,
@@ -238,15 +244,35 @@ function TopicChat({ topicId, email, chat, setChat }) {
         context: chat.messages.slice(-5)
       });
       
-      const aiMsg = { 
-        role: 'assistant', 
-        text: response.answer || 'I need more information to help you with this topic.',
-        timestamp: Date.now() 
+      const fullText = response.answer || 'I need more information to help you with this topic.';
+      
+      // 打字机效果 - 逐字显示
+      let currentIndex = 0;
+      const typingSpeed = 20; // 每个字符的延迟(ms)
+      
+      const typeNextChar = () => {
+        if (currentIndex < fullText.length) {
+          setCurrentTypingText(fullText.slice(0, currentIndex + 1));
+          currentIndex++;
+          setTimeout(typeNextChar, typingSpeed);
+        } else {
+          // 打字完成,添加到正式消息列表
+          setIsTyping(false);
+          const aiMsg = { 
+            role: 'assistant', 
+            text: fullText,
+            timestamp: Date.now() 
+          };
+          setChat(prev => ({ ...prev, messages: [...prev.messages, aiMsg] }));
+          setCurrentTypingText('');
+        }
       };
       
-      setChat(prev => ({ ...prev, messages: [...prev.messages, aiMsg] }));
+      typeNextChar();
+      
     } catch (error) {
       console.error('Topic AI request failed:', error);
+      setIsTyping(false);
       const errorMsg = { 
         role: 'assistant', 
         text: 'I apologize, but I encountered an error. Please try again.',
@@ -259,36 +285,145 @@ function TopicChat({ topicId, email, chat, setChat }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
-        {chat.messages.length === 0 ? (
+        {chat.messages.length === 0 && !isTyping ? (
           <div style={{ textAlign: 'center', marginTop: 100, color: '#6b7280' }}>
             <div style={{ fontSize: '48px', marginBottom: 20 }}>💬</div>
             <h3>Ask questions about this topic</h3>
             <p>Get personalized explanations and dive deeper into the concepts.</p>
           </div>
         ) : (
-          chat.messages.map((msg, idx) => (
-            <div key={idx} style={{ 
-              marginBottom: 20,
-              display: 'flex',
-              flexDirection: msg.role === 'user' ? 'row-reverse' : 'row'
-            }}>
-              <div style={{
-                maxWidth: '70%',
-                padding: '12px 16px',
-                borderRadius: '16px',
-                backgroundColor: msg.role === 'user' ? '#3b82f6' : '#f1f3f4',
-                color: msg.role === 'user' ? 'white' : '#333'
+          <>
+            {chat.messages.map((msg, idx) => (
+              <div key={idx} style={{ 
+                marginBottom: 24,
+                display: 'flex',
+                flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
+                gap: '12px',
+                alignItems: 'flex-start',
+                animation: 'fadeInUp 0.3s ease-out'
               }}>
-                {msg.role === 'assistant' ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {msg.text}
-                  </ReactMarkdown>
-                ) : (
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
-                )}
+                {/* 头像 */}
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: msg.role === 'user' ? '#3b82f6' : '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  {msg.role === 'user' ? '👤' : '🤖'}
+                </div>
+                
+                {/* 消息气泡 */}
+                <div style={{
+                  maxWidth: '70%',
+                  padding: '16px 20px',
+                  borderRadius: msg.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                  backgroundColor: msg.role === 'user' ? '#3b82f6' : '#ffffff',
+                  color: msg.role === 'user' ? 'white' : '#1f2937',
+                  boxShadow: msg.role === 'user' 
+                    ? '0 4px 12px rgba(59, 130, 246, 0.3)' 
+                    : '0 2px 12px rgba(0, 0, 0, 0.08)',
+                  border: msg.role === 'assistant' ? '1px solid #e5e7eb' : 'none',
+                  position: 'relative'
+                }}>
+                  {msg.role === 'assistant' ? (
+                    <div className="ai-message-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{msg.text}</div>
+                  )}
+                  
+                  {/* 时间戳 */}
+                  <div style={{
+                    fontSize: '11px',
+                    marginTop: '8px',
+                    opacity: 0.6,
+                    textAlign: msg.role === 'user' ? 'right' : 'left'
+                  }}>
+                    {new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+            
+            {/* 正在打字的消息 */}
+            {isTyping && (
+              <div style={{ 
+                marginBottom: 24,
+                display: 'flex',
+                flexDirection: 'row',
+                gap: '12px',
+                alignItems: 'flex-start',
+                animation: 'fadeInUp 0.3s ease-out'
+              }}>
+                {/* AI 头像 */}
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                  animation: 'pulse 2s ease-in-out infinite'
+                }}>
+                  🤖
+                </div>
+                
+                {/* 打字消息气泡 */}
+                <div style={{
+                  maxWidth: '70%',
+                  padding: '16px 20px',
+                  borderRadius: '20px 20px 20px 4px',
+                  backgroundColor: '#ffffff',
+                  color: '#1f2937',
+                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
+                  border: '1px solid #e5e7eb',
+                  position: 'relative',
+                  minHeight: '60px'
+                }}>
+                  {currentTypingText ? (
+                    <div className="ai-message-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {currentTypingText}
+                      </ReactMarkdown>
+                      <span className="typing-cursor">▊</span>
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 8,
+                      color: '#6b7280',
+                      fontSize: '14px'
+                    }}>
+                      <div className="thinking-spinner"></div>
+                      <span>AI is thinking</span>
+                      <span className="thinking-dots">
+                        <span>.</span>
+                        <span>.</span>
+                        <span>.</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

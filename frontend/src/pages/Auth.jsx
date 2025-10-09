@@ -12,13 +12,21 @@ const LoginPage = ({ onLoginSuccess }) => {
     password: '',
     confirmPassword: '',
     name: '',
-    terms: false
+    terms: false,
+    loginEmail: '',
+    loginPassword: '',
+    regEmail: '',
+    regPassword: '',
+    regConfirm: '',
+    regName: ''
   });
   const [stage, setStage] = useState('auth'); // auth | verify
   const [banner, setBanner] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [verify, setVerify] = useState({ email: '', countdown: 0 });
   const [oauthCtx, setOauthCtx] = useState({ loading: false, error: '' });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const extractFieldErrors = (errBody) => {
     // 根据“表单错误处理.md”的规范，data.errors 来自 Pydantic exc.errors()
@@ -36,25 +44,36 @@ const LoginPage = ({ onLoginSuccess }) => {
   };
 
   const onLoginV1 = async (loginEmail, loginPassword) => {
+    console.log('🚀 onLoginV1 called with email:', loginEmail);
     setBanner('');
     setFieldErrors({});
+    setIsLoggingIn(true);
+    
     try {
+      console.log('📤 Calling authApi.login...');
       const result = await authApi.login({ email: loginEmail, password: loginPassword });
+      console.log('✅ Login successful:', result);
+      
+      console.log('📤 Calling authApi.me...');
       const me = await authApi.me();
+      console.log('✅ Got user info:', me);
       
       // 检查是否需要显示引导
-      // (按文档要求，不在此处自动弹出任何额外UI，前端可在需要时自行触发)
+      // (按文档要求,不在此处自动弹出任何额外UI，前端可在需要时自行触发)
 
       onLoginSuccess?.(me);
     } catch (err) {
+      console.error('❌ Login error:', err);
       if (err.status === 422) {
         setFieldErrors(extractFieldErrors(err.body));
         setBanner('Validation error. Please check the fields.');
       } else if (err.status === 401) {
-        setBanner('Login failed');
+        setBanner('Incorrect password · Forgot Password?');
       } else {
         setBanner('Server error. Please try again.');
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -78,18 +97,48 @@ const LoginPage = ({ onLoginSuccess }) => {
 
   const onLogin = (e) => {
     e.preventDefault();
+    console.log('🔵 Login button clicked!');
+    console.log('📝 Form data:', formData);
     const { loginEmail, loginPassword } = formData;
-    if (!loginEmail || !loginPassword) return setBanner('Please enter email and password');
-    if (USE_AUTH_V1) return onLoginV1(loginEmail, loginPassword);
+    console.log('📧 Login email:', loginEmail);
+    console.log('🔑 Login password:', loginPassword ? '***' : '(empty)');
+    console.log('🎯 USE_AUTH_V1:', USE_AUTH_V1);
+    
+    if (!loginEmail || !loginPassword) {
+      console.log('❌ Missing email or password');
+      return setBanner('Please enter email and password');
+    }
+    
+    if (USE_AUTH_V1) {
+      console.log('→ Calling onLoginV1');
+      return onLoginV1(loginEmail, loginPassword);
+    }
+    
+    console.log('→ Calling onLoginLocal');
     return onLoginLocal(loginEmail, loginPassword);
   };
 
   const onRegisterV1 = async (regEmail, regPassword, regConfirm, regName, regTerms) => {
     setBanner('');
     setFieldErrors({});
-    if (!regEmail || !regPassword || !regConfirm) return setBanner('Please fill all required fields');
-    if (regPassword !== regConfirm) return setBanner('Passwords do not match');
-    if (!regTerms) return setBanner('Please accept the terms');
+    setIsRegistering(true);
+    
+    if (!regEmail || !regPassword || !regConfirm) {
+      setBanner('Please fill all required fields');
+      setIsRegistering(false);
+      return;
+    }
+    if (regPassword !== regConfirm) {
+      setBanner('Passwords do not match');
+      setIsRegistering(false);
+      return;
+    }
+    if (!regTerms) {
+      setBanner('Please accept the terms');
+      setIsRegistering(false);
+      return;
+    }
+    
     try {
       const result = await authApi.register({ email: regEmail, password: regPassword, name: regName });
       setVerify({ email: regEmail, token: '' });
@@ -117,6 +166,8 @@ const LoginPage = ({ onLoginSuccess }) => {
       } else {
         setBanner('Server error. Please try again.');
       }
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -328,7 +379,22 @@ const LoginPage = ({ onLoginSuccess }) => {
                 {fieldErrors['email'] && <div className="field-error">{fieldErrors['email'].join('\n')}</div>}
                 <input type="password" name="loginPassword" value={formData.loginPassword} onChange={handleInputChange} placeholder="Password" required />
                 {fieldErrors['password'] && <div className="field-error">{fieldErrors['password'].join('\n')}</div>}
-                <button type="submit">Sign In</button>
+                <button 
+                  type="submit" 
+                  disabled={isLoggingIn}
+                  style={{
+                    opacity: isLoggingIn ? 0.7 : 1,
+                    cursor: isLoggingIn ? 'not-allowed' : 'pointer',
+                    position: 'relative'
+                  }}
+                >
+                  {isLoggingIn ? (
+                    <>
+                      <span style={{ opacity: 0.6 }}>Signing In</span>
+                      <span className="loading-dots">...</span>
+                    </>
+                  ) : 'Sign In'}
+                </button>
                 
                 {/* Quick test login */}
                 <div style={{ margin: '12px 0', padding: '16px', background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '1px solid #22c55e', borderRadius: '12px' }}>
@@ -366,7 +432,22 @@ const LoginPage = ({ onLoginSuccess }) => {
                   <input type="checkbox" name="regTerms" checked={formData.regTerms} onChange={handleInputChange} />
                   I accept the terms
                 </label>
-                <button type="submit">Create account</button>
+                <button 
+                  type="submit"
+                  disabled={isRegistering}
+                  style={{
+                    opacity: isRegistering ? 0.7 : 1,
+                    cursor: isRegistering ? 'not-allowed' : 'pointer',
+                    position: 'relative'
+                  }}
+                >
+                  {isRegistering ? (
+                    <>
+                      <span style={{ opacity: 0.6 }}>Creating Account</span>
+                      <span className="loading-dots">...</span>
+                    </>
+                  ) : 'Create account'}
+                </button>
               </form>
             )}
           </>
