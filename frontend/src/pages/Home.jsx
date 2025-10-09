@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Header, Sidebar } from '../components/layout';
@@ -16,13 +16,82 @@ function TopicPage({ topicId, email, onBack }) {
   const [chat, setChat] = useState(() => dbApi.topicChat(email, topicId));
   const [progress, setProgress] = useState(() => dbApi.topicProgress(email, topicId));
 
-  useEffect(() => { 
-    dbApi.saveTopicChat(email, topicId, chat); 
+  useEffect(() => {
+    setProgress(prev => ({
+      ...prev,
+      lastVisitedAt: Date.now()
+    }));
+  }, [topicId]);
+
+  useEffect(() => {
+    dbApi.saveTopicChat(email, topicId, chat);
   }, [email, topicId, chat]);
 
-  useEffect(() => { 
+  useEffect(() => {
     dbApi.saveTopicProgress(email, topicId, progress); 
   }, [email, topicId, progress]);
+
+  const markComplete = () => {
+    setProgress(prev => ({ ...prev, completed: true, completedAt: Date.now() }));
+  };
+
+  const approxMinutes = useMemo(() => {
+    if (!topic) return 8;
+    const baseText = `${topic.content || ''} ${topic.intro || ''}`.trim();
+    const wordCount = baseText ? baseText.split(/\s+/).filter(Boolean).length : 0;
+    const readingMinutes = Math.ceil(wordCount / 180) || 3;
+    const keyPointBonus = (topic.keyPoints?.length || 0) * 2;
+    return Math.min(30, Math.max(5, readingMinutes + keyPointBonus));
+  }, [topic]);
+
+  const contentMarkdown = useMemo(() => {
+    if (topic?.content) return topic.content;
+    const sections = [];
+    if (topic?.intro) sections.push(`### Overview\n${topic.intro}`);
+    if (topic?.keyPoints?.length) {
+      sections.push(`### Key Points\n${topic.keyPoints.map(point => `- ${point}`).join('\n')}`);
+    }
+    return sections.join('\n\n') || `Content for ${topic?.name || 'this topic'} is being developed.`;
+  }, [topic]);
+
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    const date = typeof value === 'number' ? new Date(value) : new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatScore = (score) => {
+    if (score === null || score === undefined) return 'Not attempted yet';
+    if (typeof score === 'number') {
+      if (score <= 1) return `${Math.round(score * 100)}%`;
+      if (score <= 100) return `${Math.round(score)}%`;
+    }
+    return String(score);
+  };
+
+  const status = progress.completed
+    ? 'Completed'
+    : progress.lastScore !== null && progress.lastScore !== undefined
+      ? 'In progress'
+      : 'Not started';
+
+  const statusColor = status === 'Completed'
+    ? '#10b981'
+    : status === 'In progress'
+      ? '#2563eb'
+      : '#64748b';
+
+  const scoreLabel = formatScore(progress.lastScore);
+  const lastVisitedLabel = formatDateTime(progress.lastVisitedAt);
+  const completedAtLabel = formatDateTime(progress.completedAt);
+  const keyPoints = topic?.keyPoints || [];
+  const resources = Array.isArray(topic?.resources) ? topic.resources : [];
 
   if (!topic) {
     return (
@@ -34,10 +103,6 @@ function TopicPage({ topicId, email, onBack }) {
       </div>
     );
   }
-
-  const markComplete = () => {
-    setProgress(prev => ({ ...prev, completed: true, completedAt: Date.now() }));
-  };
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc' }}>
@@ -180,30 +245,412 @@ function TopicPage({ topicId, email, onBack }) {
       {/* Tab Content */}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {tab === 'content' && (
-          <div style={{ padding: 40, maxWidth: 800, margin: '0 auto' }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {topic.content || `# ${topic.name}\n\n${topic.intro || 'Content for this topic is being developed.'}\n\n${topic.keyPoints ? `## Key Points\n${topic.keyPoints.map(point => `- ${point}`).join('\n')}` : ''}`}
-            </ReactMarkdown>
-            
-            {!progress.completed && (
-              <div style={{ marginTop: 40, padding: 20, backgroundColor: '#f0f9ff', borderRadius: 8 }}>
-                <button
-                  onClick={markComplete}
-                  style={{
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Mark as Complete
-                </button>
+          <div style={{
+            padding: '36px 40px',
+            maxWidth: 960,
+            margin: '0 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 24
+          }}>
+            <section style={{
+              background: 'linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)',
+              color: '#f8fafc',
+              padding: '32px',
+              borderRadius: 24,
+              boxShadow: '0 16px 36px rgba(14,165,233,0.25)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ position: 'absolute', inset: 0, opacity: 0.1, background: 'radial-gradient(circle at top right, #ffffff 0%, transparent 60%)' }} />
+              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                  {section?.name && (
+                    <span style={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.25)',
+                      borderRadius: 999,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      letterSpacing: 0.4,
+                      textTransform: 'uppercase'
+                    }}>
+                      {section.name}
+                    </span>
+                  )}
+                  {module?.name && (
+                    <span style={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.18)',
+                      borderRadius: 999,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      letterSpacing: 0.4,
+                      textTransform: 'uppercase'
+                    }}>
+                      {module.name}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h2 style={{
+                    margin: 0,
+                    fontSize: 32,
+                    fontWeight: 700,
+                    letterSpacing: -0.5
+                  }}>
+                    {topic.name}
+                  </h2>
+                  <p style={{
+                    marginTop: 12,
+                    marginBottom: 0,
+                    maxWidth: 640,
+                    lineHeight: 1.6,
+                    fontSize: 16,
+                    color: 'rgba(248,250,252,0.9)'
+                  }}>
+                    {topic.intro || 'Content for this topic is being developed.'}
+                  </p>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 16
+                }}>
+                  <div style={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+                    borderRadius: 16,
+                    padding: '16px 18px'
+                  }}>
+                    <div style={{ fontSize: 12, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Focus area</div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{module?.name || 'Governance Essentials'}</div>
+                  </div>
+                  <div style={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.22)',
+                    borderRadius: 16,
+                    padding: '16px 18px'
+                  }}>
+                    <div style={{ fontSize: 12, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Time investment</div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginTop: 6 }}>{approxMinutes} min</div>
+                  </div>
+                  <div style={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.22)',
+                    borderRadius: 16,
+                    padding: '16px 18px'
+                  }}>
+                    <div style={{ fontSize: 12, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 0.6 }}>Learning status</div>
+                    <div style={{
+                      marginTop: 6,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontWeight: 600,
+                      fontSize: 16
+                    }}>
+                      <span style={{
+                        display: 'inline-block',
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        backgroundColor: statusColor
+                      }} />
+                      <span>{status}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </section>
+
+            <section style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 20,
+              padding: 28,
+              boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+            }}>
+              <div style={{ marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Detailed content</h3>
+                <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Review the foundational concepts before moving into discussion or practice.</p>
+              </div>
+              <div className="ai-message-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {contentMarkdown}
+                </ReactMarkdown>
+              </div>
+            </section>
+
+            {keyPoints.length > 0 && (
+              <section style={{
+                backgroundColor: '#0f172a',
+                color: '#e2e8f0',
+                borderRadius: 20,
+                padding: 28,
+                boxShadow: '0 18px 35px rgba(15,23,42,0.35)'
+              }}>
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ margin: 0, fontSize: 22 }}>Key takeaways</h3>
+                  <p style={{ margin: '8px 0 0', fontSize: 14, color: 'rgba(226,232,240,0.75)' }}>Focus on these core points to unlock the next modules.</p>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 16
+                }}>
+                  {keyPoints.map((point, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                        border: '1px solid rgba(148,163,184,0.25)',
+                        borderRadius: 16,
+                        padding: 18,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                        minHeight: 120
+                      }}
+                    >
+                      <span style={{ fontSize: 24, opacity: 0.75 }}>⭐</span>
+                      <p style={{ margin: 0, lineHeight: 1.6, fontSize: 15 }}>{point}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
+
+            {(topic?.quiz || topic?.scenario) && (
+              <section style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 20,
+                padding: 28,
+                boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+              }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Apply what you learn</h3>
+                  <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Reinforce understanding with quick checks and scenario-based practice.</p>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: 16
+                }}>
+                  {topic?.quiz && (
+                    <div style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 16,
+                      padding: 20,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 60%)'
+                    }}>
+                      <div style={{ fontSize: 26 }}>📝</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 6px', fontSize: 16, color: '#0f172a' }}>Quick knowledge check</h4>
+                        <p style={{ margin: 0, fontSize: 14, color: '#475569' }}>
+                          {topic.quiz.questions?.length || 0} curated questions • {progress.eligible ? 'Ready when you are' : 'Unlock after reviewing content'}
+                        </p>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#1d4ed8', fontWeight: 600 }}>Quiz experience coming soon</div>
+                    </div>
+                  )}
+                  {topic?.scenario && (
+                    <div style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 16,
+                      padding: 20,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 12,
+                      background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 60%)'
+                    }}>
+                      <div style={{ fontSize: 26 }}>🎯</div>
+                      <div>
+                        <h4 style={{ margin: '0 0 6px', fontSize: 16, color: '#0f172a' }}>Scenario simulation</h4>
+                        <p style={{ margin: 0, fontSize: 14, color: '#475569' }}>Practice decision-making in a safe environment to build boardroom confidence.</p>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>Interactive practice available in the Practice tab</div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {resources.length > 0 && (
+              <section style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 20,
+                padding: 28,
+                boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+              }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Supporting resources</h3>
+                  <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Continue your exploration with curated reads and references.</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {resources.map((resource, idx) => (
+                    <a
+                      key={idx}
+                      href={resource.url || '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px 18px',
+                        borderRadius: 14,
+                        border: '1px solid #e2e8f0',
+                        textDecoration: 'none',
+                        color: '#0f172a',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                        boxShadow: '0 6px 14px rgba(15,23,42,0.06)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.12)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 6px 14px rgba(15,23,42,0.06)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 15 }}>{resource.title || 'Resource link'}</span>
+                        <span style={{ fontSize: 13, color: '#64748b' }}>{resource.source || 'External reference'}</span>
+                      </div>
+                      <span style={{ fontSize: 18, color: '#2563eb' }}>↗</span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 20,
+              padding: 28,
+              boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Progress tracker</h3>
+                    <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Keep tabs on your learning momentum.</p>
+                  </div>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    borderRadius: 999,
+                    padding: '6px 14px',
+                    backgroundColor: `${statusColor}1a`,
+                    color: statusColor,
+                    fontWeight: 600,
+                    fontSize: 13
+                  }}>
+                    <span style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: statusColor
+                    }} />
+                    {status}
+                  </span>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: 16
+                }}>
+                  <div style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 16,
+                    padding: 18,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8
+                  }}>
+                    <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Last visited</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{lastVisitedLabel}</span>
+                  </div>
+                  <div style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 16,
+                    padding: 18,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8
+                  }}>
+                    <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Quiz readiness</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{scoreLabel}</span>
+                    {progress.eligible && (
+                      <span style={{ fontSize: 12, color: '#10b981' }}>Eligible for quiz retake</span>
+                    )}
+                  </div>
+                  <div style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 16,
+                    padding: 18,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8
+                  }}>
+                    <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Completion</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{progress.completed ? completedAtLabel : 'Pending your review'}</span>
+                  </div>
+                </div>
+
+                {!progress.completed ? (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 16,
+                    alignItems: 'center'
+                  }}>
+                    <button
+                      onClick={markComplete}
+                      style={{
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 12,
+                        padding: '12px 24px',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 12px 24px rgba(37,99,235,0.35)',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 16px 32px rgba(37,99,235,0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(37,99,235,0.35)';
+                      }}
+                    >
+                      Mark topic as complete
+                    </button>
+                    <span style={{ fontSize: 13, color: '#64748b' }}>Marking complete helps personalize your learning recommendations.</span>
+                  </div>
+                ) : (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    background: '#ecfdf5',
+                    borderRadius: 14,
+                    padding: '12px 16px',
+                    border: '1px solid rgba(16,185,129,0.2)',
+                    color: '#047857'
+                  }}>
+                    <span style={{ fontSize: 20 }}>🎉</span>
+                    <span>Great job! You completed this theme on {completedAtLabel === '—' ? 'your last visit' : completedAtLabel}.</span>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
         )}
 
