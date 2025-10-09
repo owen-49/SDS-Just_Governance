@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import User
+from app.models import User
 
 # 根据 user_id 查找用户
 async def get_user_by_id(db: AsyncSession, user_id: UUID | str) -> Optional[User]:

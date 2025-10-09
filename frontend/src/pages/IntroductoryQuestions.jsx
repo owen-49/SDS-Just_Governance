@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentLayout } from '../components/layout';
 import { dbApi } from '../services/localDb';
+import { onboardingApi, transformAnswersToBackendFormat } from '../services/onboarding';
 
 const IntroductoryQuestions = () => {
   const [answers, setAnswers] = useState({
@@ -31,17 +32,40 @@ const IntroductoryQuestions = () => {
   const [limitMsg, setLimitMsg] = useState('');
   const [savedAt, setSavedAt] = useState(null);
   const [score, setScore] = useState(null);
+  const [level, setLevel] = useState(null); // 'new', 'developing', 'strong'
   const [showResults, setShowResults] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
+  // 页面加载时尝试从后端获取已保存的问卷结果
   useEffect(() => {
-    const rec = dbApi.getLatestIntroQuestionnaire();
-    if (rec?.data) {
-      setAnswers(prev => ({ ...prev, ...rec.data }));
-      setSavedAt(rec.created_at);
-      if (rec.data.score) {
-        setScore(rec.data.score);
+    const loadSurveyResult = async () => {
+      try {
+        // 尝试从后端获取结果
+        const result = await onboardingApi.getResult();
+        if (result) {
+          setScore(result.score);
+          setLevel(result.level);
+          setSavedAt(result.submitted_at);
+          setShowResults(true);
+        }
+      } catch (error) {
+        // 如果后端获取失败 (404 表示未提交过)，尝试从 localStorage 读取
+        if (error.status !== 404) {
+          console.error('Failed to load survey result from backend:', error);
+        }
+        // 降级：从 localStorage 读取
+        const rec = dbApi.getLatestIntroQuestionnaire();
+        if (rec?.data) {
+          setAnswers(prev => ({ ...prev, ...rec.data }));
+          setSavedAt(rec.created_at);
+          if (rec.data.score) {
+            setScore(rec.data.score);
+          }
+        }
       }
-    }
+    };
+    loadSurveyResult();
   }, []);
 
   const handleRadio = (key, value) => {
@@ -131,7 +155,15 @@ const IntroductoryQuestions = () => {
     return totalScore;
   };
 
-  const getScoreCategory = (score) => {
+  const getScoreCategory = (score, backendLevel = null) => {
+    // 如果后端提供了 level，使用后端的分类
+    if (backendLevel) {
+      if (backendLevel === 'strong') return 'Strong Understanding';
+      if (backendLevel === 'developing') return 'Developing Understanding';
+      if (backendLevel === 'new') return 'New to Governance';
+    }
+    
+    // 否则使用前端的分数范围判断（保持向后兼容）
     if (score <= 14) return 'New to Governance';
     else if (score <= 21) return 'Developing Understanding';
     else return 'Strong Understanding';
@@ -194,26 +226,97 @@ const IntroductoryQuestions = () => {
     }
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
+    console.log('🎯 onSubmit function called!', e);
     e.preventDefault();
-    const finalScore = calculateScore();
-    setScore(finalScore);
+    console.log('🔵 Submit button clicked!');
+    console.log('📝 Current answers:', answers);
     
-    const res = dbApi.saveIntroQuestionnaire({ ...answers, score: finalScore });
-    if (res.ok) {
-      setSavedAt(res.record.created_at);
+    setIsSubmitting(true);
+    setSubmitError('');
+    
+    try {
+      // 1. 转换答案格式为后端期望的格式
+      console.log('🔄 Transforming answers...');
+      console.log('🔍 transformAnswersToBackendFormat function:', transformAnswersToBackendFormat);
+      
+      let backendAnswers;
+      try {
+        backendAnswers = transformAnswersToBackendFormat(answers);
+        console.log('✅ Transformed answers:', backendAnswers);
+      } catch (transformError) {
+        console.error('❌ Error during transformation:', transformError);
+        throw transformError;
+      }
+      
+      // 2. 提交到后端
+      console.log('📤 Submitting to backend...');
+      console.log('🔍 onboardingApi:', onboardingApi);
+      console.log('🔍 Payload:', { answers: backendAnswers });
+      
+      let result;
+      try {
+        result = await onboardingApi.submitSurvey(backendAnswers);
+        console.log('✅ Backend response:', result);
+      } catch (apiError) {
+        console.error('❌ Error during API call:', apiError);
+        throw apiError;
+      }
+      
+      // 3. 更新前端状态
+      setScore(result.score);
+      setLevel(result.level);
+      setSavedAt(new Date().toISOString());
       setShowResults(true);
-      // Scroll to results
+      
+      // 4. 同时保存到 localStorage 作为备份
+      dbApi.saveIntroQuestionnaire({ ...answers, score: result.score });
+      
+      // 5. 滚动到结果区域
       setTimeout(() => {
         const resultsElement = document.getElementById('results-section');
         if (resultsElement) {
           resultsElement.scrollIntoView({ behavior: 'smooth' });
         }
       }, 100);
-    } else if (res.code === 'not_logged_in') {
-      alert('Please sign in before submitting.');
-    } else {
-      alert('Failed to save. Please try again.');
+      
+    } catch (error) {
+      console.error('❌ Failed to submit survey to backend:', error);
+      console.error('❌ Error type:', error.constructor.name);
+      console.error('❌ Error details:', {
+        status: error.status,
+        message: error.message,
+        body: error.body,
+        stack: error.stack
+      });
+      
+      // 降级处理：如果后端提交失败，仍然保存到 localStorage
+      if (error.status === 409) {
+        // 已经提交过
+        setSubmitError('You have already submitted this questionnaire. Your previous submission has been saved.');
+        setShowResults(true);
+      } else if (error.status === 401) {
+        // 未登录
+        setSubmitError('⚠️ Please sign in first to submit the questionnaire. Click here to go to login page.');
+        alert('You need to sign in first! Please visit http://localhost:3000/login to create an account or sign in.');
+        // 可选：自动跳转到登录页
+        // window.location.href = '/login';
+      } else {
+        // 其他错误：计算本地分数并保存
+        const finalScore = calculateScore();
+        setScore(finalScore);
+        
+        const res = dbApi.saveIntroQuestionnaire({ ...answers, score: finalScore });
+        if (res.ok) {
+          setSavedAt(res.record.created_at);
+          setShowResults(true);
+          setSubmitError('Unable to submit to server. Your answers have been saved locally.');
+        } else {
+          setSubmitError('Failed to save. Please try again.');
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -226,7 +329,7 @@ const IntroductoryQuestions = () => {
         <div style={{ background:'#ecfeff', border:'1px solid #67e8f9', color:'#155e75', padding:12, borderRadius:6, marginBottom:20 }}>
           Last saved: {new Date(savedAt).toLocaleString()}
           {score && <div style={{ marginTop: 8, fontWeight: 'bold' }}>
-            Your Score: {score}/30 - {getScoreCategory(score)}
+            Your Score: {score}/30 - {getScoreCategory(score, level)}
           </div>}
         </div>
       )}
@@ -240,6 +343,19 @@ const IntroductoryQuestions = () => {
       {limitMsg && (
         <div style={{ color:'#dc2626', background:'#fef2f2', border:'1px solid #fecaca', padding:8, borderRadius:6, marginBottom:12 }}>
           {limitMsg}
+        </div>
+      )}
+
+      {submitError && (
+        <div style={{ 
+          color: submitError.includes('saved locally') || submitError.includes('already submitted') ? '#d97706' : '#dc2626', 
+          background: submitError.includes('saved locally') || submitError.includes('already submitted') ? '#fef3c7' : '#fef2f2', 
+          border: submitError.includes('saved locally') || submitError.includes('already submitted') ? '1px solid #fcd34d' : '1px solid #fecaca', 
+          padding: 12, 
+          borderRadius: 6, 
+          marginBottom: 12 
+        }}>
+          {submitError}
         </div>
       )}
 
@@ -608,19 +724,23 @@ const IntroductoryQuestions = () => {
 
         <button 
           type="submit" 
+          disabled={isSubmitting}
           style={{
-            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            background: isSubmitting 
+              ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)' 
+              : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
             color: 'white',
             border: 'none',
             padding: '12px 24px',
             borderRadius: '8px',
             fontSize: '16px',
             fontWeight: '600',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+            opacity: isSubmitting ? 0.7 : 1
           }}
         >
-          Submit Questionnaire
+          {isSubmitting ? 'Submitting...' : 'Submit Questionnaire'}
         </button>
       </form>
 
@@ -664,6 +784,7 @@ const IntroductoryQuestions = () => {
 
           {(() => {
             const recommendations = getDetailedRecommendations(score);
+            const displayLevel = getScoreCategory(score, level);
             return (
               <div>
                 <div style={{
@@ -681,7 +802,7 @@ const IntroductoryQuestions = () => {
                     display: 'flex',
                     alignItems: 'center'
                   }}>
-                    📊 Your Assessment Level: {recommendations.title}
+                    📊 Your Assessment Level: {displayLevel}
                   </h3>
                   <p style={{ 
                     fontSize: '16px', 

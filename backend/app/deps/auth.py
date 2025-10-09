@@ -41,7 +41,7 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db),
         raise HTTPException(401, "unauthenticated", headers={"WWW-Authenticate": "Bearer"})
 
     # 步骤四：加载用户对象
-    from repositories.auth.users import get_user_by_id
+    from app.repositories.auth.users import get_user_by_id
     user = await get_user_by_id(db, user_id)
     if not user or not getattr(user, "is_active", True):    # 若用户不存在或已经账号已注销：仍然返回401 + 1001（未授权）
         raise HTTPException(401, "unauthenticated", headers={"WWW-Authenticate": "Bearer"})

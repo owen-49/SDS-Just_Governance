@@ -196,8 +196,8 @@ async def submit_survey(payload: SubmitPayload,
                     request=request)
 
     total, level = calculate_score(payload.answers)
-    async with session.begin():
-        await create_full_survey(session, user.id, payload.answers, total, level)
+    await create_full_survey(session, user.id, payload.answers, total, level)
+    await session.commit()
 
     return ok(data=SubmitResult(score=total, level=level).model_dump(), request=request)
 
