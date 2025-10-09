@@ -8,6 +8,7 @@ import { dbApi } from '../services/localDb';
 import { sections as fallbackSections } from '../constants/structure';
 import { aiAsk } from '../services/api';
 import { learningApi } from '../services/learning';
+import { globalResources } from '../constants/globalResources';
 
 const createEmptyProgress = () => ({
   status: 'not_started',
@@ -737,55 +738,90 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               </section>
             )}
 
-            {resources.length > 0 && (
-              <section style={{
-                backgroundColor: '#ffffff',
-                borderRadius: 20,
-                padding: 28,
-                boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
-              }}>
-                <div style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Supporting resources</h3>
-                  <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Continue your exploration with curated reads and references.</p>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {resources.map((resource, idx) => (
-                    <a
-                      key={idx}
-                      href={resource.url || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '16px 18px',
-                        borderRadius: 14,
-                        border: '1px solid #e2e8f0',
-                        textDecoration: 'none',
-                        color: '#0f172a',
-                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                        boxShadow: '0 6px 14px rgba(15,23,42,0.06)'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.12)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 6px 14px rgba(15,23,42,0.06)';
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: 15 }}>{resource.title || 'Resource link'}</span>
-                        <span style={{ fontSize: 13, color: '#64748b' }}>{resource.source || 'External reference'}</span>
-                      </div>
-                      <span style={{ fontSize: 18, color: '#2563eb' }}>↗</span>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            )}
+            <section style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 20,
+              padding: 28,
+              boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+            }}>
+              <div style={{ marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Supporting resources</h3>
+                <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Continue your exploration with curated reads and references.</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* 主题特定的资源 */}
+                {resources.map((resource, idx) => (
+                  <a
+                    key={`topic-resource-${idx}`}
+                    href={resource.url || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '16px 18px',
+                      borderRadius: 14,
+                      border: '1px solid #e2e8f0',
+                      textDecoration: 'none',
+                      color: '#0f172a',
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      boxShadow: '0 6px 14px rgba(15,23,42,0.06)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.12)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 6px 14px rgba(15,23,42,0.06)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>{resource.title || 'Resource link'}</span>
+                      <span style={{ fontSize: 13, color: '#64748b' }}>{resource.source || 'External reference'}</span>
+                    </div>
+                    <span style={{ fontSize: 18, color: '#2563eb' }}>↗</span>
+                  </a>
+                ))}
+                
+                {/* 全局资源 - 从配置文件读取 */}
+                {globalResources.map((resource, idx) => (
+                  <a
+                    key={`global-resource-${idx}`}
+                    href={resource.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '16px 18px',
+                      borderRadius: 14,
+                      border: '1px solid #e2e8f0',
+                      textDecoration: 'none',
+                      color: '#0f172a',
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      boxShadow: '0 6px 14px rgba(15,23,42,0.06)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.12)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 6px 14px rgba(15,23,42,0.06)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>{resource.title}</span>
+                      <span style={{ fontSize: 13, color: '#64748b' }}>{resource.source}</span>
+                    </div>
+                    <span style={{ fontSize: 18, color: '#2563eb' }}>↗</span>
+                  </a>
+                ))}
+              </div>
+            </section>
 
             <section style={{
               backgroundColor: '#ffffff',
