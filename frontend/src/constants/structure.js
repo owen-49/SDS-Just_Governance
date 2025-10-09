@@ -19,9 +19,7 @@ export const sections = [
               'Free cash flow (FCF) and its importance',
               'Cash conversion cycle basics'
             ],
-            resources: [
-              { title: 'Intro to Cash Flow Statements', source: 'Investopedia', url: 'https://www.investopedia.com/terms/c/cashflowstatement.asp' }
-            ],
+            resources: [],
             scenario: false,
             quiz: {
               questions: [
