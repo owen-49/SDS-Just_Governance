@@ -10,59 +10,6 @@ import { aiAsk } from '../services/api';
 import { learningApi } from '../services/learning';
 import { globalResources } from '../constants/globalResources';
 
-const createEmptyProgress = () => ({
-  status: 'not_started',
-  lastScore: null,
-  bestScore: null,
-  attemptCount: 0,
-  markedComplete: false,
-  completedAt: null,
-  lastVisitedAt: null,
-  quizState: 'none',
-  lastQuizSessionId: null,
-});
-
-function mergeProgress(summary, progress) {
-  const merged = createEmptyProgress();
-
-  if (summary) {
-    if (summary.progress_status) merged.status = summary.progress_status;
-    if (summary.best_score !== undefined && summary.best_score !== null) {
-      merged.bestScore = summary.best_score;
-    }
-    if (summary.last_score !== undefined && summary.last_score !== null) {
-      merged.lastScore = summary.last_score;
-    }
-    if (summary.marked_complete !== undefined) {
-      merged.markedComplete = Boolean(summary.marked_complete);
-    }
-  }
-
-  if (progress) {
-    if (progress.progress_status) merged.status = progress.progress_status;
-    if (progress.best_score !== undefined && progress.best_score !== null) {
-      merged.bestScore = progress.best_score;
-    }
-    if (progress.last_score !== undefined && progress.last_score !== null) {
-      merged.lastScore = progress.last_score;
-    }
-    if (progress.attempt_count !== undefined && progress.attempt_count !== null) {
-      merged.attemptCount = progress.attempt_count;
-    }
-    if (progress.marked_complete !== undefined) {
-      merged.markedComplete = Boolean(progress.marked_complete);
-    }
-    if (progress.completed_at) merged.completedAt = progress.completed_at;
-    if (progress.last_visited_at) merged.lastVisitedAt = progress.last_visited_at;
-    if (progress.quiz_state) merged.quizState = progress.quiz_state;
-    if (progress.last_quiz_session_id) {
-      merged.lastQuizSessionId = progress.last_quiz_session_id;
-    }
-  }
-
-  return merged;
-}
-
 function buildTopicIndex(structure) {
   const index = {};
   structure.forEach((section) => {
@@ -79,6 +26,8 @@ function buildTopicIndex(structure) {
 function TopicPage({ topicId, topicRef, source, email, onBack }) {
   const { section, module, topic } = topicRef || {};
   const isApiSource = source === 'api';
+  const createEmptyProgress = learningApi.createEmptyProgress;
+  const mergeProgress = learningApi.mergeProgress;
   const [tab, setTab] = useState('content');
   const [chat, setChat] = useState(() => dbApi.topicChat(email, topicId));
   const [progress, setProgress] = useState(() => (isApiSource ? createEmptyProgress() : dbApi.topicProgress(email, topicId)));
@@ -152,17 +101,20 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
         if (cancelled) return;
 
         if (detail?.topic) {
-          setTopicMeta(prev => (prev ? { ...prev, ...detail.topic } : { ...detail.topic }));
+          setTopicMeta(prev => {
+            const normalized = learningApi.normalizeTopic(detail.topic) || {};
+            return {
+              ...(prev || {}),
+              ...normalized,
+              raw: detail.topic,
+            };
+          });
         }
 
         setProgress(mergeProgress(detail?.progress_summary, progressData));
 
         if (contentData) {
-          const resources = Array.isArray(contentData.resources)
-            ? contentData.resources
-            : contentData?.resources && typeof contentData.resources === 'object'
-              ? Object.entries(contentData.resources).map(([title, url]) => ({ title, url }))
-              : [];
+          const resources = learningApi.normalizeResourceList(contentData.resources);
           setContent({
             body: contentData.body_markdown || '',
             summary: contentData.summary || '',
@@ -279,6 +231,13 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
   const scoreLabel = formatScore(scoreValue);
   const lastVisitedLabel = formatDateTime(progress.lastVisitedAt);
   const completedAtLabel = formatDateTime(progress.completedAt);
+  const passThresholdLabel = (() => {
+    const value = topicData?.passThreshold;
+    if (value === null || value === undefined) return '—';
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '—';
+    return `${Math.round(numeric * 100)}%`;
+  })();
 
   const completed = isApiSource
     ? progress.markedComplete || progress.status === 'completed'
@@ -898,6 +857,19 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                     <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Completion</span>
                     <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{completed ? completedAtLabel : 'Pending your review'}</span>
                   </div>
+                  {isApiSource && topicData?.passThreshold !== undefined && topicData?.passThreshold !== null && (
+                    <div style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 16,
+                      padding: 18,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8
+                    }}>
+                      <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Pass threshold</span>
+                      <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{passThresholdLabel}</span>
+                    </div>
+                  )}
                 </div>
 
                 {!completed ? (
