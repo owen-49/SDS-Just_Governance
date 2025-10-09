@@ -5,54 +5,202 @@ import { Header, Sidebar } from '../components/layout';
 import { Modal } from '../components/ui';
 import { AssessmentModal, GlobalChat } from '../components/features';
 import { dbApi } from '../services/localDb';
-import { findTopicById } from '../constants/structure';
+import { sections as fallbackSections } from '../constants/structure';
 import { aiAsk } from '../services/api';
+import { learningApi } from '../services/learning';
+
+const createEmptyProgress = () => ({
+  status: 'not_started',
+  lastScore: null,
+  bestScore: null,
+  attemptCount: 0,
+  markedComplete: false,
+  completedAt: null,
+  lastVisitedAt: null,
+  quizState: 'none',
+  lastQuizSessionId: null,
+});
+
+function mergeProgress(summary, progress) {
+  const merged = createEmptyProgress();
+
+  if (summary) {
+    if (summary.progress_status) merged.status = summary.progress_status;
+    if (summary.best_score !== undefined && summary.best_score !== null) {
+      merged.bestScore = summary.best_score;
+    }
+    if (summary.last_score !== undefined && summary.last_score !== null) {
+      merged.lastScore = summary.last_score;
+    }
+    if (summary.marked_complete !== undefined) {
+      merged.markedComplete = Boolean(summary.marked_complete);
+    }
+  }
+
+  if (progress) {
+    if (progress.progress_status) merged.status = progress.progress_status;
+    if (progress.best_score !== undefined && progress.best_score !== null) {
+      merged.bestScore = progress.best_score;
+    }
+    if (progress.last_score !== undefined && progress.last_score !== null) {
+      merged.lastScore = progress.last_score;
+    }
+    if (progress.attempt_count !== undefined && progress.attempt_count !== null) {
+      merged.attemptCount = progress.attempt_count;
+    }
+    if (progress.marked_complete !== undefined) {
+      merged.markedComplete = Boolean(progress.marked_complete);
+    }
+    if (progress.completed_at) merged.completedAt = progress.completed_at;
+    if (progress.last_visited_at) merged.lastVisitedAt = progress.last_visited_at;
+    if (progress.quiz_state) merged.quizState = progress.quiz_state;
+    if (progress.last_quiz_session_id) {
+      merged.lastQuizSessionId = progress.last_quiz_session_id;
+    }
+  }
+
+  return merged;
+}
+
+function buildTopicIndex(structure) {
+  const index = {};
+  structure.forEach((section) => {
+    (section.modules || []).forEach((module) => {
+      (module.topics || []).forEach((topic) => {
+        index[topic.id] = { section, module, topic };
+      });
+    });
+  });
+  return index;
+}
 
 // TopicPage Component - handles individual topic views
-function TopicPage({ topicId, email, onBack }) {
-  const found = findTopicById(topicId);
-  const { section, module, topic } = found || {};
+function TopicPage({ topicId, topicRef, source, email, onBack }) {
+  const { section, module, topic } = topicRef || {};
+  const isApiSource = source === 'api';
   const [tab, setTab] = useState('content');
   const [chat, setChat] = useState(() => dbApi.topicChat(email, topicId));
-  const [progress, setProgress] = useState(() => dbApi.topicProgress(email, topicId));
+  const [progress, setProgress] = useState(() => (isApiSource ? createEmptyProgress() : dbApi.topicProgress(email, topicId)));
+  const [topicMeta, setTopicMeta] = useState(topic || null);
+  const [content, setContent] = useState(null);
+  const [loading, setLoading] = useState(isApiSource);
+  const [error, setError] = useState(null);
+  const [completeError, setCompleteError] = useState(null);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
-    setProgress(prev => ({
-      ...prev,
-      lastVisitedAt: Date.now()
-    }));
-  }, [topicId]);
+    setChat(dbApi.topicChat(email, topicId));
+  }, [email, topicId]);
+
+  useEffect(() => {
+    setTopicMeta(topic || null);
+  }, [topic]);
+
+  useEffect(() => {
+    setContent(null);
+    setError(null);
+    setCompleteError(null);
+    if (isApiSource) {
+      setProgress(createEmptyProgress());
+    } else {
+      setProgress(dbApi.topicProgress(email, topicId));
+    }
+  }, [topicId, email, isApiSource]);
 
   useEffect(() => {
     dbApi.saveTopicChat(email, topicId, chat);
   }, [email, topicId, chat]);
 
   useEffect(() => {
-    dbApi.saveTopicProgress(email, topicId, progress); 
-  }, [email, topicId, progress]);
-
-  const markComplete = () => {
-    setProgress(prev => ({ ...prev, completed: true, completedAt: Date.now() }));
-  };
-
-  const approxMinutes = useMemo(() => {
-    if (!topic) return 8;
-    const baseText = `${topic.content || ''} ${topic.intro || ''}`.trim();
-    const wordCount = baseText ? baseText.split(/\s+/).filter(Boolean).length : 0;
-    const readingMinutes = Math.ceil(wordCount / 180) || 3;
-    const keyPointBonus = (topic.keyPoints?.length || 0) * 2;
-    return Math.min(30, Math.max(5, readingMinutes + keyPointBonus));
-  }, [topic]);
-
-  const contentMarkdown = useMemo(() => {
-    if (topic?.content) return topic.content;
-    const sections = [];
-    if (topic?.intro) sections.push(`### Overview\n${topic.intro}`);
-    if (topic?.keyPoints?.length) {
-      sections.push(`### Key Points\n${topic.keyPoints.map(point => `- ${point}`).join('\n')}`);
+    if (!isApiSource) {
+      dbApi.saveTopicProgress(email, topicId, progress);
     }
-    return sections.join('\n\n') || `Content for ${topic?.name || 'this topic'} is being developed.`;
-  }, [topic]);
+  }, [email, topicId, progress, isApiSource]);
+
+  useEffect(() => {
+    if (isApiSource) return;
+    setProgress(prev => ({
+      ...prev,
+      lastVisitedAt: Date.now()
+    }));
+  }, [topicId, isApiSource]);
+
+  useEffect(() => {
+    if (!isApiSource || !topicId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const [detail, progressData, contentData] = await Promise.all([
+          learningApi.getTopicDetail(topicId).catch(err => {
+            if (err?.status === 404) return null;
+            throw err;
+          }),
+          learningApi.getTopicProgress(topicId).catch(err => {
+            if (err?.status === 404) return null;
+            throw err;
+          }),
+          learningApi.getTopicContent(topicId).catch(err => {
+            if (err?.status === 404) return null;
+            throw err;
+          })
+        ]);
+
+        if (cancelled) return;
+
+        if (detail?.topic) {
+          setTopicMeta(prev => (prev ? { ...prev, ...detail.topic } : { ...detail.topic }));
+        }
+
+        setProgress(mergeProgress(detail?.progress_summary, progressData));
+
+        if (contentData) {
+          const resources = Array.isArray(contentData.resources)
+            ? contentData.resources
+            : contentData?.resources && typeof contentData.resources === 'object'
+              ? Object.entries(contentData.resources).map(([title, url]) => ({ title, url }))
+              : [];
+          setContent({
+            body: contentData.body_markdown || '',
+            summary: contentData.summary || '',
+            resources,
+          });
+        } else {
+          setContent(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err);
+          setProgress(createEmptyProgress());
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+
+      try {
+        await learningApi.visitTopic(topicId);
+        if (!cancelled) {
+          setProgress(prev => ({
+            ...prev,
+            status: prev.status === 'not_started' ? 'in_progress' : prev.status,
+            lastVisitedAt: new Date().toISOString(),
+          }));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId, isApiSource]);
+
+  const topicData = topicMeta || topic || null;
 
   const formatDateTime = (value) => {
     if (!value) return '—';
@@ -75,11 +223,73 @@ function TopicPage({ topicId, email, onBack }) {
     return String(score);
   };
 
-  const status = progress.completed
-    ? 'Completed'
-    : progress.lastScore !== null && progress.lastScore !== undefined
-      ? 'In progress'
-      : 'Not started';
+  const keyPoints = useMemo(() => {
+    if (!isApiSource) return topicData?.keyPoints || [];
+    if (!content?.summary) return [];
+    if (Array.isArray(content.summary)) return content.summary;
+    if (typeof content.summary === 'string') {
+      return content.summary
+        .split(/\n+/)
+        .map(line => line.replace(/^[-*]\s*/, '').trim())
+        .filter(Boolean);
+    }
+    return [];
+  }, [isApiSource, content, topicData]);
+
+  const approxMinutes = useMemo(() => {
+    const baseText = [
+      content?.body,
+      content?.summary,
+      topicData?.content,
+      topicData?.intro
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const wordCount = baseText ? baseText.split(/\s+/).filter(Boolean).length : 0;
+    const readingMinutes = Math.ceil(wordCount / 180) || 3;
+    const keyPointBonus = keyPoints.length * 2;
+    return Math.min(30, Math.max(5, readingMinutes + keyPointBonus));
+  }, [content, topicData, keyPoints]);
+
+  const contentMarkdown = useMemo(() => {
+    if (content?.body) return content.body;
+    if (topicData?.content) return topicData.content;
+    const sections = [];
+    const overview = content?.summary || topicData?.intro;
+    if (overview) sections.push(`### Overview\n${overview}`);
+    if (keyPoints.length) {
+      sections.push(`### Key Points\n${keyPoints.map(point => `- ${point}`).join('\n')}`);
+    }
+    return sections.join('\n\n') || `Content for ${topicData?.name || 'this topic'} is being developed.`;
+  }, [content, topicData, keyPoints]);
+
+  const resources = useMemo(() => {
+    if (isApiSource) {
+      return Array.isArray(content?.resources) ? content.resources : [];
+    }
+    return Array.isArray(topicData?.resources) ? topicData.resources : [];
+  }, [content, isApiSource, topicData]);
+
+  const scoreValue = isApiSource
+    ? (progress.lastScore ?? progress.bestScore)
+    : progress.lastScore;
+
+  const scoreLabel = formatScore(scoreValue);
+  const lastVisitedLabel = formatDateTime(progress.lastVisitedAt);
+  const completedAtLabel = formatDateTime(progress.completedAt);
+
+  const completed = isApiSource
+    ? progress.markedComplete || progress.status === 'completed'
+    : Boolean(progress.completed);
+
+  const status = isApiSource
+    ? (completed ? 'Completed' : progress.status === 'in_progress' ? 'In progress' : 'Not started')
+    : completed
+      ? 'Completed'
+      : progress.lastScore !== null && progress.lastScore !== undefined
+        ? 'In progress'
+        : 'Not started';
 
   const statusColor = status === 'Completed'
     ? '#10b981'
@@ -87,13 +297,54 @@ function TopicPage({ topicId, email, onBack }) {
       ? '#2563eb'
       : '#64748b';
 
-  const scoreLabel = formatScore(progress.lastScore);
-  const lastVisitedLabel = formatDateTime(progress.lastVisitedAt);
-  const completedAtLabel = formatDateTime(progress.completedAt);
-  const keyPoints = topic?.keyPoints || [];
-  const resources = Array.isArray(topic?.resources) ? topic.resources : [];
+  const isEligibleForQuiz = isApiSource ? progress.status !== 'not_started' : Boolean(progress.eligible);
 
-  if (!topic) {
+  const markComplete = async () => {
+    if (!topicData) return;
+    if (!isApiSource) {
+      setProgress(prev => ({ ...prev, completed: true, completedAt: Date.now() }));
+      return;
+    }
+
+    setCompleting(true);
+    setCompleteError(null);
+    try {
+      const result = await learningApi.completeTopic(topicId);
+      setProgress(prev => ({
+        ...prev,
+        status: 'completed',
+        markedComplete: true,
+        completedAt: result?.completed_at || new Date().toISOString(),
+      }));
+    } catch (err) {
+      if (err?.status === 409) {
+        const threshold = err?.body?.data?.pass_threshold;
+        setCompleteError(
+          threshold !== undefined
+            ? `Score below required threshold (${Math.round(Number(threshold) * 100)}%). Please review the material and try again.`
+            : 'Score below required threshold. Please review the material and try again.'
+        );
+      } else if (err?.body?.message) {
+        setCompleteError(err.body.message);
+      } else {
+        setCompleteError('Failed to mark topic complete. Please try again later.');
+      }
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const errorMessage = error?.body?.message || error?.message;
+
+  if (!topicData && loading) {
+    return (
+      <div style={{ padding: 40 }}>
+        <p>Loading topic…</p>
+      </div>
+    );
+  }
+
+  if (!topicData) {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <h2>Topic not found</h2>
@@ -160,7 +411,7 @@ function TopicPage({ topicId, email, onBack }) {
             </div>
           </div>
           
-          {progress.completed && (
+          {completed && (
             <div style={{
               background: 'linear-gradient(135def, #10b981, #059669)',
               color: 'white',
@@ -190,7 +441,7 @@ function TopicPage({ topicId, email, onBack }) {
           backgroundClip: 'text',
           lineHeight: '1.2'
         }}>
-          {topic.name}
+          {topicData.name}
         </h1>
 
         {/* Tab Navigation */}
@@ -244,6 +495,19 @@ function TopicPage({ topicId, email, onBack }) {
 
       {/* Tab Content */}
       <div style={{ flex: 1, overflow: 'auto' }}>
+        {error && (
+          <div style={{
+            padding: '12px 40px',
+            margin: '0 auto',
+            maxWidth: 960,
+            color: '#991b1b',
+            background: '#fee2e2',
+            borderBottom: '1px solid #fecaca'
+          }}>
+            {errorMessage || 'We could not load the latest topic data. Showing cached information.'}
+          </div>
+        )}
+
         {tab === 'content' && (
           <div style={{
             padding: '36px 40px',
@@ -297,7 +561,7 @@ function TopicPage({ topicId, email, onBack }) {
                     fontWeight: 700,
                     letterSpacing: -0.5
                   }}>
-                    {topic.name}
+                    {topicData.name}
                   </h2>
                   <p style={{
                     marginTop: 12,
@@ -307,7 +571,7 @@ function TopicPage({ topicId, email, onBack }) {
                     fontSize: 16,
                     color: 'rgba(248,250,252,0.9)'
                   }}>
-                    {topic.intro || 'Content for this topic is being developed.'}
+                    {topicData?.intro || content?.summary || 'Content for this topic is being developed.'}
                   </p>
                 </div>
                 <div style={{
@@ -415,7 +679,7 @@ function TopicPage({ topicId, email, onBack }) {
               </section>
             )}
 
-            {(topic?.quiz || topic?.scenario) && (
+            {(topicData?.quiz || topicData?.scenario) && (
               <section style={{
                 backgroundColor: '#ffffff',
                 borderRadius: 20,
@@ -431,7 +695,7 @@ function TopicPage({ topicId, email, onBack }) {
                   gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
                   gap: 16
                 }}>
-                  {topic?.quiz && (
+                  {topicData?.quiz && (
                     <div style={{
                       border: '1px solid #e2e8f0',
                       borderRadius: 16,
@@ -445,13 +709,13 @@ function TopicPage({ topicId, email, onBack }) {
                       <div>
                         <h4 style={{ margin: '0 0 6px', fontSize: 16, color: '#0f172a' }}>Quick knowledge check</h4>
                         <p style={{ margin: 0, fontSize: 14, color: '#475569' }}>
-                          {topic.quiz.questions?.length || 0} curated questions • {progress.eligible ? 'Ready when you are' : 'Unlock after reviewing content'}
+                          {topicData.quiz.questions?.length || 0} curated questions • {isEligibleForQuiz ? 'Ready when you are' : 'Unlock after reviewing content'}
                         </p>
                       </div>
                       <div style={{ fontSize: 13, color: '#1d4ed8', fontWeight: 600 }}>Quiz experience coming soon</div>
                     </div>
                   )}
-                  {topic?.scenario && (
+                  {topicData?.scenario && (
                     <div style={{
                       border: '1px solid #e2e8f0',
                       borderRadius: 16,
@@ -583,7 +847,7 @@ function TopicPage({ topicId, email, onBack }) {
                   }}>
                     <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Quiz readiness</span>
                     <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{scoreLabel}</span>
-                    {progress.eligible && (
+                    {isEligibleForQuiz && (
                       <span style={{ fontSize: 12, color: '#10b981' }}>Eligible for quiz retake</span>
                     )}
                   </div>
@@ -596,11 +860,11 @@ function TopicPage({ topicId, email, onBack }) {
                     gap: 8
                   }}>
                     <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8' }}>Completion</span>
-                    <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{progress.completed ? completedAtLabel : 'Pending your review'}</span>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: '#0f172a' }}>{completed ? completedAtLabel : 'Pending your review'}</span>
                   </div>
                 </div>
 
-                {!progress.completed ? (
+                {!completed ? (
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
@@ -609,30 +873,36 @@ function TopicPage({ topicId, email, onBack }) {
                   }}>
                     <button
                       onClick={markComplete}
+                      disabled={completing}
                       style={{
-                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        background: completing ? 'rgba(37, 99, 235, 0.5)' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 12,
                         padding: '12px 24px',
                         fontSize: 15,
                         fontWeight: 600,
-                        cursor: 'pointer',
+                        cursor: completing ? 'not-allowed' : 'pointer',
                         boxShadow: '0 12px 24px rgba(37,99,235,0.35)',
                         transition: 'transform 0.2s ease, box-shadow 0.2s ease'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 16px 32px rgba(37,99,235,0.4)';
+                        if (!completing) {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 16px 32px rgba(37,99,235,0.4)';
+                        }
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
                         e.currentTarget.style.boxShadow = '0 12px 24px rgba(37,99,235,0.35)';
                       }}
                     >
-                      Mark topic as complete
+                      {completing ? 'Marking…' : 'Mark topic as complete'}
                     </button>
                     <span style={{ fontSize: 13, color: '#64748b' }}>Marking complete helps personalize your learning recommendations.</span>
+                    {completeError && (
+                      <span style={{ fontSize: 13, color: '#dc2626' }}>{completeError}</span>
+                    )}
                   </div>
                 ) : (
                   <div style={{
@@ -1039,6 +1309,11 @@ function ScenarioSim({ topic }) {
 
 // Main Home Component
 export default function Home({ user, onSignOut }) {
+  const [structure, setStructure] = useState(() => fallbackSections);
+  const [structureSource, setStructureSource] = useState('local');
+  const [structureLoading, setStructureLoading] = useState(true);
+  const [structureError, setStructureError] = useState(null);
+  const [topicsIndex, setTopicsIndex] = useState(() => buildTopicIndex(fallbackSections));
   const [topicId, setTopicId] = useState(null);
   const [showOverview, setShowOverview] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
@@ -1069,6 +1344,56 @@ export default function Home({ user, onSignOut }) {
     }));
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStructure() {
+      setStructureLoading(true);
+      try {
+        const remote = await learningApi.fetchStructure();
+        if (cancelled) return;
+        if (remote && remote.length > 0) {
+          setStructure(remote);
+          setTopicsIndex(buildTopicIndex(remote));
+          setStructureSource('api');
+          setStructureError(null);
+        } else {
+          setStructure(fallbackSections);
+          setTopicsIndex(buildTopicIndex(fallbackSections));
+          setStructureSource('local');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load learning structure', err);
+          setStructureError(err);
+          setStructure(fallbackSections);
+          setTopicsIndex(buildTopicIndex(fallbackSections));
+          setStructureSource('local');
+        }
+      } finally {
+        if (!cancelled) {
+          setStructureLoading(false);
+        }
+      }
+    }
+
+    loadStructure();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (topicId && !topicsIndex[topicId]) {
+      setTopicId(null);
+    }
+  }, [topicId, topicsIndex]);
+
+  const structureErrorMessage = structureError?.body?.message || structureError?.message;
+
+  const currentTopicRef = topicId ? topicsIndex[topicId] : null;
+
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -1085,6 +1410,8 @@ export default function Home({ user, onSignOut }) {
         
         <div style={{ display: 'flex', flex: 1 }}>
           <Sidebar
+            sections={structure}
+            loading={structureLoading}
             ui={navUi}
             onToggleCollapsed={onToggleCollapsed}
             onToggleSection={onToggleSection}
@@ -1094,19 +1421,31 @@ export default function Home({ user, onSignOut }) {
             user={user}
           />
           
-          <main style={{ 
+          <main style={{
             background: '#f8fafc',
             overflow: 'hidden',
             position: 'relative',
             flex: 1
           }}>
+            {structureSource !== 'api' && structureError && (
+              <div style={{
+                padding: '12px 24px',
+                background: '#fff7ed',
+                color: '#9a3412',
+                borderBottom: '1px solid #fed7aa'
+              }}>
+                {structureErrorMessage || 'Unable to reach the learning service. Showing local demo content.'}
+              </div>
+            )}
             {!topicId ? (
               <GlobalChat email={user.email} />
             ) : (
-              <TopicPage 
-                topicId={topicId} 
-                email={user.email} 
-                onBack={onBackToHome} 
+              <TopicPage
+                topicId={topicId}
+                topicRef={currentTopicRef}
+                source={structureSource}
+                email={user.email}
+                onBack={onBackToHome}
               />
             )}
           </main>
