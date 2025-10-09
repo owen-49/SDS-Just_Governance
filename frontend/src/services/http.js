@@ -5,6 +5,17 @@ const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8000";
 let accessToken = null;
 let onUnauthorized = null;
 
+// 友好的错误消息映射
+const ERROR_MESSAGES = {
+  network_error: 'Network connection failed. Please check your internet connection.',
+  server_error: 'Server is temporarily unavailable. Please try again later.',
+  unauthorized: 'Your session has expired. Please sign in again.',
+  validation_error: 'Invalid request. Please check your input.',
+  conflict: 'This action conflicts with existing data.',
+  rate_limited: 'Too many requests. Please wait a moment.',
+  not_found: 'The requested resource was not found.',
+};
+
 export function setAccessToken(token) {
   accessToken = token || null;
 }
@@ -59,7 +70,18 @@ async function refreshTokenOnce() {
 }
 
 export async function request(input, init = {}) {
-  let res = await doFetch(input, init);
+  let res;
+  
+  try {
+    res = await doFetch(input, init);
+  } catch (e) {
+    // 网络错误
+    const err = new Error(ERROR_MESSAGES.network_error);
+    err.type = 'network_error';
+    err.originalError = e;
+    throw err;
+  }
+  
   if (res.ok) return parseBody(res);
 
   const errorBody = await parseBody(res);
@@ -74,54 +96,56 @@ export async function request(input, init = {}) {
         res = await doFetch(input, init);
         if (res.ok) return parseBody(res);
       }
-      // 刷新失败，视作未授权
-      onUnauthorized?.();
-    } else if (code === 1004 || code === 1001) {
-      // token_invalid 或 unauthenticated - 不尝试刷新，直接清理状态
       onUnauthorized?.();
     } else {
-      // 其他401情况（未认证等）按未授权处理
       onUnauthorized?.();
     }
 
-    const err = new Error('unauthorized');
+    const err = new Error(ERROR_MESSAGES.unauthorized);
     err.status = 401;
     err.body = errorBody;
     err.retryAfter = retryAfter;
     throw err;
   }
 
+  if (res.status === 404) {
+    const err = new Error(errorBody?.message || ERROR_MESSAGES.not_found);
+    err.status = 404;
+    err.body = errorBody;
+    throw err;
+  }
+
   if (res.status === 422) {
-    const err = new Error('validation_error');
+    const err = new Error(errorBody?.message || ERROR_MESSAGES.validation_error);
     err.status = 422;
     err.body = errorBody;
     throw err;
   }
 
   if (res.status === 409) {
-    const err = new Error('conflict');
+    const err = new Error(errorBody?.message || ERROR_MESSAGES.conflict);
     err.status = 409;
     err.body = errorBody;
     throw err;
   }
 
   if (res.status === 429) {
-    const err = new Error('rate_limited');
+    const err = new Error(ERROR_MESSAGES.rate_limited);
     err.status = 429;
     err.body = errorBody;
     err.retryAfter = retryAfter;
     throw err;
   }
 
-  if (res.status >= 500 && res.status < 600) {
-    const err = new Error('server_error');
+  if (res.status >= 500) {
+    const err = new Error(ERROR_MESSAGES.server_error);
     err.status = res.status;
     err.body = errorBody;
     err.retryAfter = retryAfter;
     throw err;
   }
 
-  const err = new Error('http_error');
+  const err = new Error(errorBody?.message || 'Request failed');
   err.status = res.status;
   err.body = errorBody;
   err.retryAfter = retryAfter;

@@ -83,45 +83,49 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
 
     (async () => {
       try {
-        const [detail, progressData, contentData] = await Promise.all([
-          learningApi.getTopicDetail(topicId).catch(err => {
-            if (err?.status === 404) return null;
-            throw err;
-          }),
-          learningApi.getTopicProgress(topicId).catch(err => {
-            if (err?.status === 404) return null;
-            throw err;
-          }),
-          learningApi.getTopicContent(topicId).catch(err => {
-            if (err?.status === 404) return null;
-            throw err;
-          })
+        // 使用 allSettled 避免单个请求失败影响其他请求
+        const results = await Promise.allSettled([
+          learningApi.getTopicDetail(topicId),
+          learningApi.getTopicProgress(topicId),
+          learningApi.getTopicContent(topicId)
         ]);
 
         if (cancelled) return;
 
-        if (detail?.topic) {
+        const [detailResult, progressResult, contentResult] = results;
+        
+        // 处理 detail
+        if (detailResult.status === 'fulfilled' && detailResult.value?.topic) {
           setTopicMeta(prev => {
-            const normalized = learningApi.normalizeTopic(detail.topic) || {};
+            const normalized = learningApi.normalizeTopic(detailResult.value.topic) || {};
             return {
               ...(prev || {}),
               ...normalized,
-              raw: detail.topic,
+              raw: detailResult.value.topic,
             };
           });
         }
 
+        // 处理 progress
+        const detail = detailResult.status === 'fulfilled' ? detailResult.value : null;
+        const progressData = progressResult.status === 'fulfilled' ? progressResult.value : null;
         setProgress(mergeProgress(detail?.progress_summary, progressData));
 
-        if (contentData) {
-          const resources = learningApi.normalizeResourceList(contentData.resources);
+        // 处理 content
+        if (contentResult.status === 'fulfilled' && contentResult.value) {
+          const resources = learningApi.normalizeResourceList(contentResult.value.resources);
           setContent({
-            body: contentData.body_markdown || '',
-            summary: contentData.summary || '',
+            body: contentResult.value.body_markdown || '',
+            summary: contentResult.value.summary || '',
             resources,
           });
         } else {
           setContent(null);
+        }
+        
+        // 如果所有请求都失败，设置错误
+        if (results.every(r => r.status === 'rejected')) {
+          setError(results[0].reason);
         }
       } catch (err) {
         if (!cancelled) {
@@ -134,6 +138,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
         }
       }
 
+      // 访问记录 - 独立处理，失败不影响主流程
       try {
         await learningApi.visitTopic(topicId);
         if (!cancelled) {
@@ -144,7 +149,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
           }));
         }
       } catch {
-        /* ignore */
+        // 静默失败
       }
     })();
 
@@ -278,16 +283,21 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
       }));
     } catch (err) {
       if (err?.status === 409) {
-        const threshold = err?.body?.data?.pass_threshold;
-        setCompleteError(
-          threshold !== undefined
-            ? `Score below required threshold (${Math.round(Number(threshold) * 100)}%). Please review the material and try again.`
-            : 'Score below required threshold. Please review the material and try again.'
-        );
-      } else if (err?.body?.message) {
-        setCompleteError(err.body.message);
+        const message = err?.body?.message;
+        if (message?.includes('already_marked_complete')) {
+          setCompleteError('This topic is already marked as complete.');
+        } else {
+          const threshold = err?.body?.data?.pass_threshold;
+          setCompleteError(
+            threshold !== undefined
+              ? `Your score (${scoreLabel}) is below the required threshold (${Math.round(Number(threshold) * 100)}%). Please complete the quiz first.`
+              : 'Please complete the quiz before marking this topic as complete.'
+          );
+        }
+      } else if (err?.status === 404) {
+        setCompleteError('This topic no longer exists.');
       } else {
-        setCompleteError('Failed to mark topic complete. Please try again later.');
+        setCompleteError(err.message || 'Failed to mark topic complete. Please try again.');
       }
     } finally {
       setCompleting(false);
@@ -298,17 +308,59 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
 
   if (!topicData && loading) {
     return (
-      <div style={{ padding: 40 }}>
-        <p>Loading topic…</p>
+      <div style={{ 
+        padding: 40, 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '400px',
+        gap: 16
+      }}>
+        <div style={{ 
+          width: 48, 
+          height: 48, 
+          border: '4px solid #e5e7eb',
+          borderTopColor: '#3b82f6',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <p style={{ color: '#6b7280', fontSize: 14 }}>Loading topic content...</p>
       </div>
     );
   }
 
   if (!topicData) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <h2>Topic not found</h2>
-        <button onClick={onBack} style={{ padding: '8px 16px', marginTop: 20 }}>
+      <div style={{ 
+        padding: 40, 
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '400px',
+        gap: 16
+      }}>
+        <div style={{ fontSize: 48, opacity: 0.5 }}>📚</div>
+        <h2 style={{ margin: 0, color: '#1f2937' }}>Topic not found</h2>
+        <p style={{ margin: '8px 0', color: '#6b7280' }}>
+          {error ? 'Unable to load this topic. It may have been removed or you may not have access.' : 'This topic doesn\'t exist.'}
+        </p>
+        <button 
+          onClick={onBack} 
+          style={{ 
+            padding: '10px 20px', 
+            marginTop: 12,
+            background: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 14,
+            fontWeight: 500
+          }}
+        >
           ← Back to Home
         </button>
       </div>
@@ -317,16 +369,16 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc' }}>
-      {/* Topic Header */}
+      {/* Topic Header - 响应式优化 */}
       <div style={{ 
         background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
         borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-        padding: '24px 32px'
+        padding: 'clamp(16px, 4vw, 24px) clamp(16px, 4vw, 32px)'
       }}>
         {/* Top Row: Back Button + Breadcrumb + Status */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'clamp(12px, 3vw, 20px)', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 16px)', flexWrap: 'wrap' }}>
             <button 
               onClick={onBack}
               style={{
@@ -335,7 +387,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 borderRadius: '8px',
                 padding: '10px 16px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: 'clamp(13px, 2vw, 14px)',
                 color: '#059669',
                 fontWeight: '500',
                 display: 'flex',
@@ -361,9 +413,10 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               display: 'flex', 
               alignItems: 'center', 
               gap: 8,
-              fontSize: '14px', 
+              fontSize: 'clamp(12px, 2vw, 14px)', 
               color: '#64748b',
-              fontWeight: '500'
+              fontWeight: '500',
+              flexWrap: 'wrap'
             }}>
               <span>{section?.name}</span>
               <span style={{ color: '#cbd5e1' }}>→</span>
@@ -373,11 +426,11 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
           
           {completed && (
             <div style={{
-              background: 'linear-gradient(135def, #10b981, #059669)',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
               color: 'white',
               padding: '6px 12px',
               borderRadius: '16px',
-              fontSize: '12px',
+              fontSize: 'clamp(11px, 2vw, 12px)',
               fontWeight: '600',
               display: 'flex',
               alignItems: 'center',
@@ -392,9 +445,9 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
 
         {/* Title */}
         <h1 style={{ 
-          fontSize: '32px', 
+          fontSize: 'clamp(24px, 5vw, 32px)', 
           fontWeight: '700', 
-          margin: '0 0 20px 0', 
+          margin: '0 0 clamp(12px, 3vw, 20px) 0', 
           background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -404,8 +457,8 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
           {topicData.name}
         </h1>
 
-        {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        {/* Tab Navigation - 移动端可横向滚动 */}
+        <div style={{ display: 'flex', gap: 'clamp(4px, 1vw, 8px)', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
           {[
             { key: 'content', label: 'Content', icon: '📖' },
             { key: 'conversation', label: 'Discussion', icon: '💬' },
@@ -415,7 +468,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               key={key}
               onClick={() => setTab(key)}
               style={{
-                padding: '10px 16px',
+                padding: 'clamp(8px, 2vw, 10px) clamp(12px, 3vw, 16px)',
                 background: tab === key 
                   ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
                   : 'rgba(37, 99, 235, 0.1)',
@@ -425,13 +478,15 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                   : '1px solid rgba(37, 99, 235, 0.2)',
                 borderRadius: '8px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: 'clamp(12px, 2vw, 14px)',
                 fontWeight: '600',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
                 transition: 'all 0.2s ease',
-                boxShadow: tab === key ? '0 4px 12px rgba(37, 99, 235, 0.3)' : 'none'
+                boxShadow: tab === key ? '0 4px 12px rgba(37, 99, 235, 0.3)' : 'none',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
               onMouseOver={(e) => {
                 if (tab !== key) {
@@ -457,37 +512,64 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {error && (
           <div style={{
-            padding: '12px 40px',
+            padding: '16px 40px',
             margin: '0 auto',
             maxWidth: 960,
             color: '#991b1b',
             background: '#fee2e2',
-            borderBottom: '1px solid #fecaca'
+            borderBottom: '1px solid #fecaca',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16
           }}>
-            {errorMessage || 'We could not load the latest topic data. Showing cached information.'}
+            <div style={{ flex: 1 }}>
+              <strong style={{ display: 'block', marginBottom: 4 }}>Unable to load complete topic data</strong>
+              <span style={{ fontSize: 14 }}>{errorMessage || 'Showing cached or partial information.'}</span>
+            </div>
+            {error?.type === 'network_error' && (
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: '8px 16px',
+                  background: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
         {tab === 'content' && (
           <div style={{
-            padding: '36px 40px',
+            padding: 'clamp(20px, 5vw, 36px) clamp(16px, 5vw, 40px)',
             maxWidth: 960,
             margin: '0 auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: 24
+            gap: 'clamp(16px, 3vw, 24px)',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <section style={{
               background: 'linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)',
               color: '#f8fafc',
-              padding: '32px',
-              borderRadius: 24,
+              padding: 'clamp(20px, 5vw, 32px)',
+              borderRadius: 'clamp(16px, 3vw, 24px)',
               boxShadow: '0 16px 36px rgba(14,165,233,0.25)',
               position: 'relative',
               overflow: 'hidden'
             }}>
               <div style={{ position: 'absolute', inset: 0, opacity: 0.1, background: 'radial-gradient(circle at top right, #ffffff 0%, transparent 60%)' }} />
-              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'clamp(16px, 3vw, 24px)' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                   {section?.name && (
                     <span style={{
@@ -517,7 +599,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 <div>
                   <h2 style={{
                     margin: 0,
-                    fontSize: 32,
+                    fontSize: 'clamp(24px, 5vw, 32px)',
                     fontWeight: 700,
                     letterSpacing: -0.5
                   }}>
@@ -528,7 +610,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                     marginBottom: 0,
                     maxWidth: 640,
                     lineHeight: 1.6,
-                    fontSize: 16,
+                    fontSize: 'clamp(14px, 3vw, 16px)',
                     color: 'rgba(248,250,252,0.9)'
                   }}>
                     {topicData?.intro || content?.summary || 'Content for this topic is being developed.'}
@@ -536,8 +618,8 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 </div>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: 16
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                  gap: 'clamp(12px, 2vw, 16px)'
                 }}>
                   <div style={{
                     backgroundColor: 'rgba(15, 23, 42, 0.28)',
@@ -1152,8 +1234,8 @@ function TopicChat({ topicId, email, chat, setChat }) {
         )}
       </div>
 
-      <div style={{ padding: '24px 20px', borderTop: '1px solid #e5e7eb', backgroundColor: '#fff' }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+      <div style={{ padding: 'clamp(16px, 4vw, 24px) clamp(12px, 3vw, 20px)', borderTop: '1px solid #e5e7eb', backgroundColor: '#fff' }}>
+        <div style={{ display: 'flex', gap: 'clamp(8px, 2vw, 16px)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -1165,12 +1247,12 @@ function TopicChat({ topicId, email, chat, setChat }) {
             }}
             placeholder="Ask about this topic..."
             style={{
-              flex: 1,
-              padding: '16px 20px',
+              flex: '1 1 200px',
+              padding: 'clamp(12px, 3vw, 16px) clamp(16px, 3vw, 20px)',
               border: '2px solid #e5e7eb',
               borderRadius: '16px',
               resize: 'none',
-              fontSize: '16px',
+              fontSize: 'clamp(14px, 3vw, 16px)',
               fontFamily: 'inherit',
               lineHeight: '1.4',
               minHeight: '56px',
@@ -1186,17 +1268,18 @@ function TopicChat({ topicId, email, chat, setChat }) {
             onClick={send}
             disabled={!input.trim()}
             style={{
-              padding: '16px 24px',
+              padding: 'clamp(12px, 3vw, 16px) clamp(16px, 4vw, 24px)',
               backgroundColor: input.trim() ? '#3b82f6' : '#ccc',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
               cursor: input.trim() ? 'pointer' : 'not-allowed',
-              fontSize: '16px',
+              fontSize: 'clamp(14px, 3vw, 16px)',
               fontWeight: '600',
-              height: '56px',
+              minHeight: '56px',
               boxShadow: input.trim() ? '0 2px 8px rgba(59, 130, 246, 0.3)' : 'none',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
             }}
           >
             Send
@@ -1354,33 +1437,45 @@ export default function Home({ user, onSignOut }) {
 
   useEffect(() => {
     let cancelled = false;
+    let retryCount = 0;
+    const maxRetries = 2;
 
     async function loadStructure() {
       setStructureLoading(true);
-      try {
-        const remote = await learningApi.fetchStructure();
-        if (cancelled) return;
-        if (remote && remote.length > 0) {
-          setStructure(remote);
-          setTopicsIndex(buildTopicIndex(remote));
-          setStructureSource('api');
-          setStructureError(null);
-        } else {
-          setStructure(fallbackSections);
-          setTopicsIndex(buildTopicIndex(fallbackSections));
-          setStructureSource('local');
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Failed to load learning structure', err);
-          setStructureError(err);
-          setStructure(fallbackSections);
-          setTopicsIndex(buildTopicIndex(fallbackSections));
-          setStructureSource('local');
-        }
-      } finally {
-        if (!cancelled) {
-          setStructureLoading(false);
+      
+      while (retryCount <= maxRetries && !cancelled) {
+        try {
+          const remote = await learningApi.fetchStructure();
+          if (cancelled) return;
+          
+          if (remote && remote.length > 0) {
+            setStructure(remote);
+            setTopicsIndex(buildTopicIndex(remote));
+            setStructureSource('api');
+            setStructureError(null);
+            return;
+          } else {
+            setStructure(fallbackSections);
+            setTopicsIndex(buildTopicIndex(fallbackSections));
+            setStructureSource('local');
+            return;
+          }
+        } catch (err) {
+          retryCount++;
+          if (retryCount > maxRetries && !cancelled) {
+            console.error('Failed to load learning structure after retries', err);
+            setStructureError(err);
+            setStructure(fallbackSections);
+            setTopicsIndex(buildTopicIndex(fallbackSections));
+            setStructureSource('local');
+          } else if (!cancelled) {
+            // 等待后重试
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          }
+        } finally {
+          if (cancelled || retryCount > maxRetries) {
+            setStructureLoading(false);
+          }
         }
       }
     }

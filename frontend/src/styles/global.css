@@ -8,6 +8,133 @@
   --z-modal: 9999;
 }
 
+/* 性能优化 - 平滑动画 */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.thinking-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.thinking-dots span {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+.typing-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* 响应式设计 - 移动端优化 */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
+  /* 确保移动端滚动流畅 */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 移动端按钮触摸优化 */
+  button, a {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    touch-action: manipulation;
+  }
+  
+  /* 防止移动端文本选择 */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* 小屏幕适配 */
+@media (max-width: 640px) {
+  /* 减小字体大小 */
+  h1 { font-size: 24px !important; }
+  h2 { font-size: 20px !important; }
+  h3 { font-size: 18px !important; }
+  
+  /* 减小内边距 */
+  [style*="padding: 40px"] {
+    padding: 20px !important;
+  }
+  
+  [style*="padding: 32px"] {
+    padding: 16px !important;
+  }
+  
+  [style*="padding: 28px"] {
+    padding: 16px !important;
+  }
+  
+  [style*="padding: 24px"] {
+    padding: 12px !important;
+  }
+  
+  /* 移动端网格布局优化 */
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* 移动端弹性布局优化 */
+  [style*="display: flex"][style*="gap: 16px"] {
+    gap: 12px !important;
+  }
+}
+
+/* 横屏模式优化 */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* 减小垂直间距 */
+  [style*="padding: 40px"],
+  [style*="padding: 32px"] {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 增大可点击区域 */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* 优化输入框 */
+  input, textarea {
+    font-size: 16px !important; /* 防止iOS自动缩放 */
+  }
+}
+
 /* 防止内容溢出 */
 html, body {
   overflow-x: hidden;
