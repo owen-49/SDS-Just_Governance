@@ -1,5 +1,40 @@
 import { request } from './http';
 
+// 简单的内存缓存，避免重复请求
+const cache = {
+  boards: null,
+  modules: {},
+  topics: {},
+  content: {},
+  ttl: 5 * 60 * 1000, // 5分钟缓存
+};
+
+function getCacheKey(type, id) {
+  return id ? `${type}_${id}` : type;
+}
+
+function getCache(type, id) {
+  const key = getCacheKey(type, id);
+  const cached = id ? cache[type]?.[id] : cache[type];
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > cache.ttl) {
+    if (id) delete cache[type][id];
+    else cache[type] = null;
+    return null;
+  }
+  return cached.data;
+}
+
+function setCache(type, id, data) {
+  const timestamp = Date.now();
+  if (id) {
+    if (!cache[type]) cache[type] = {};
+    cache[type][id] = { data, timestamp };
+  } else {
+    cache[type] = { data, timestamp };
+  }
+}
+
 function unwrap(body) {
   return body?.data ?? body ?? null;
 }
@@ -93,21 +128,39 @@ function mergeProgress(summary, progress) {
 }
 
 async function listBoards({ page = 1, size = 100, sort = 'sort_order', order = 'asc' } = {}) {
+  const cached = getCache('boards');
+  if (cached) return cached;
+  
   const search = new URLSearchParams({ page: String(page), size: String(size), sort, order });
   const body = await request(`/api/v1/boards?${search.toString()}`);
-  return unwrap(body);
+  const result = unwrap(body);
+  
+  setCache('boards', null, result);
+  return result;
 }
 
 async function listModules(boardId, { page = 1, size = 100, sort = 'sort_order', order = 'asc' } = {}) {
+  const cached = getCache('modules', boardId);
+  if (cached) return cached;
+  
   const search = new URLSearchParams({ page: String(page), size: String(size), sort, order });
   const body = await request(`/api/v1/boards/${boardId}/modules?${search.toString()}`);
-  return unwrap(body);
+  const result = unwrap(body);
+  
+  setCache('modules', boardId, result);
+  return result;
 }
 
 async function listTopics(moduleId, { page = 1, size = 200, sort = 'sort_order', order = 'asc' } = {}) {
+  const cached = getCache('topics', moduleId);
+  if (cached) return cached;
+  
   const search = new URLSearchParams({ page: String(page), size: String(size), sort, order });
   const body = await request(`/api/v1/modules/${moduleId}/topics?${search.toString()}`);
-  return unwrap(body);
+  const result = unwrap(body);
+  
+  setCache('topics', moduleId, result);
+  return result;
 }
 
 async function getTopicDetail(topicId) {
@@ -116,8 +169,14 @@ async function getTopicDetail(topicId) {
 }
 
 async function getTopicContent(topicId) {
+  const cached = getCache('content', topicId);
+  if (cached) return cached;
+  
   const body = await request(`/api/v1/topics/${topicId}/content`);
-  return unwrap(body);
+  const result = unwrap(body);
+  
+  setCache('content', topicId, result);
+  return result;
 }
 
 async function getTopicProgress(topicId) {

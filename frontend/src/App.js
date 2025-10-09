@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import LoginPage from "./pages/Auth";
 import './styles/app.css';
 import Home from './pages/Home';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import IntroductoryQuestions from './pages/IntroductoryQuestions';
@@ -54,11 +56,16 @@ function App() {
           <Route path="/terms" element={<TermsAndConditions />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          
           {/* Login page: redirect to home if already logged in */}
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />} />
-          {/* Home and other pages require login */}
+          
+          {/* Protected pages require login */}
           <Route path="/" element={user ? <Home user={user} onSignOut={handleLogout} /> : <Navigate to="/login" replace />} />
+          <Route path="/profile" element={user ? <Profile user={user} onBack={() => window.history.back()} /> : <Navigate to="/login" replace />} />
+          <Route path="/settings" element={user ? <Settings user={user} onBack={() => window.history.back()} onSignOut={handleLogout} /> : <Navigate to="/login" replace />} />
           <Route path="/welcome" element={user ? <IntroductoryQuestions /> : <Navigate to="/login" replace />} />
+          
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

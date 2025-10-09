@@ -37,13 +37,40 @@ export default function Sidebar({
 
   return (
     <aside style={{
-      width: collapsed ? 56 : 280,
-      background: 'linear-gradient(180deg, #0b1220 0%, #0f172a 100%)', color: '#e2e8f0', height: 'calc(100vh - 56px)',
-      transition: 'width .2s ease', position: 'sticky', top: 56, overflowY: 'auto', borderRight: '1px solid #0b1220'
+      width: collapsed ? 56 : 'min(280px, 100vw)',
+      background: 'linear-gradient(180deg, #0b1220 0%, #0f172a 100%)', 
+      color: '#e2e8f0', 
+      height: 'calc(100vh - 56px)',
+      transition: 'width .2s ease', 
+      position: 'sticky', 
+      top: 56, 
+      overflowY: 'auto', 
+      overflowX: 'hidden',
+      borderRight: '1px solid #0b1220',
+      zIndex: 'var(--z-sidebar)'
     }}>
-      <div style={{ padding: 12, display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center' }}>
-        {!collapsed && <div style={{ fontWeight: 700, letterSpacing: .3 }}>Navigation</div>}
-        <button onClick={onToggleCollapsed} title={collapsed ? 'Expand' : 'Collapse'} style={{ background: 'transparent', color: '#e2e8f0', border: 'none', cursor: 'pointer', fontSize: 16 }}>{collapsed ? '›' : '‹'}</button>
+      <div style={{ 
+        padding: 'clamp(8px, 2vw, 12px)', 
+        display: 'flex', 
+        justifyContent: collapsed ? 'center' : 'space-between', 
+        alignItems: 'center' 
+      }}>
+        {!collapsed && <div style={{ fontWeight: 700, letterSpacing: .3, fontSize: 'clamp(13px, 2vw, 14px)' }}>Navigation</div>}
+        <button 
+          onClick={onToggleCollapsed} 
+          title={collapsed ? 'Expand' : 'Collapse'} 
+          style={{ 
+            background: 'transparent', 
+            color: '#e2e8f0', 
+            border: 'none', 
+            cursor: 'pointer', 
+            fontSize: 'clamp(14px, 3vw, 16px)',
+            padding: 8,
+            touchAction: 'manipulation'
+          }}
+        >
+          {collapsed ? '›' : '‹'}
+        </button>
       </div>
 
       {/* Search box (displayed when expanded) */}
