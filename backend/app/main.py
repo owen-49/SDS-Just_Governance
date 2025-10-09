@@ -14,30 +14,34 @@ from app.core.logging.logging_config import setup_logging
 from app.middleware.access_log import AccessLogMiddleware
 from app.middleware.request_id import RequestIDMiddleware
 
-setup_logging(fmt="pretty")
-
 
 @asynccontextmanager
-def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):
+    # ---- startup ----
     setup_logging(fmt="pretty")
     logging.getLogger(__name__).info("logging configured (lifespan)")
-    yield
+    try:
+        yield
+    finally:
+        # ---- shutdown ----
+        # 在此处做资源清理，如关闭会话、连接池等
+        logging.getLogger(__name__).info("shutdown complete")
 
 
 app = FastAPI(title="Just Governance API", version="0.1.0", lifespan=lifespan)
 
+# middlewares
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(AccessLogMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000"],  # 按需调整
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 setup_exception_handlers(app)
-
 
 @app.get("/")
 def root():
@@ -49,12 +53,11 @@ def root():
         "healthz": "http://127.0.0.1:8000/healthz",
     }
 
-
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
 
-
+# routers
 app.include_router(chat_router, prefix="/ai")
 app.include_router(assessment_router)
 app.include_router(auth_router, prefix="/api/v1")
