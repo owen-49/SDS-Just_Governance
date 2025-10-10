@@ -37,6 +37,15 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
   const [error, setError] = useState(null);
   const [completeError, setCompleteError] = useState(null);
   const [completing, setCompleting] = useState(false);
+  const [ragQuery, setRagQuery] = useState('');
+  const [ragResults, setRagResults] = useState([]);
+  const [ragLoading, setRagLoading] = useState(false);
+  const [ragError, setRagError] = useState(null);
+  const [quizData, setQuizData] = useState(null);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState(null);
+  const [quizResult, setQuizResult] = useState(null);
 
   useEffect(() => {
     setChat(dbApi.topicChat(email, topicId));
@@ -55,6 +64,13 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
     } else {
       setProgress(dbApi.topicProgress(email, topicId));
     }
+    setRagQuery('');
+    setRagResults([]);
+    setRagError(null);
+    setQuizData(null);
+    setQuizAnswers({});
+    setQuizError(null);
+    setQuizResult(null);
   }, [topicId, email, isApiSource]);
 
   useEffect(() => {
@@ -74,6 +90,39 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
       lastVisitedAt: Date.now()
     }));
   }, [topicId, isApiSource]);
+
+  useEffect(() => {
+    if (!isApiSource || !topicId) return;
+    if (progress.quizState !== 'pending' || quizData || quizLoading) return;
+
+    let cancelled = false;
+    setQuizLoading(true);
+    setQuizError(null);
+
+    (async () => {
+      try {
+        const data = await learningApi.startTopicQuiz(topicId);
+        if (cancelled) return;
+        setQuizData(data);
+        setQuizAnswers({});
+        if (data?.progress) {
+          setProgress(prev => mergeProgress(prev, data.progress));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setQuizError(err?.body?.message || err?.message || 'Unable to load quiz.');
+        }
+      } finally {
+        if (!cancelled) {
+          setQuizLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isApiSource, topicId, progress.quizState, quizData, quizLoading, mergeProgress]);
 
   useEffect(() => {
     if (!isApiSource || !topicId) return;
@@ -301,6 +350,95 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
       }
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const handleRagSubmit = async (event) => {
+    event?.preventDefault();
+    const query = ragQuery.trim();
+    if (!query) {
+      setRagResults([]);
+      return;
+    }
+    setRagLoading(true);
+    setRagError(null);
+    try {
+      const result = await learningApi.searchTopicRag(topicId, query, { limit: 5 });
+      setRagResults(result?.results ?? []);
+    } catch (err) {
+      setRagError(err?.body?.message || err?.message || 'Unable to search supporting materials.');
+    } finally {
+      setRagLoading(false);
+    }
+  };
+
+  const handleStartQuiz = async () => {
+    if (!topicId) return;
+    setQuizLoading(true);
+    setQuizError(null);
+    setQuizResult(null);
+    try {
+      const data = await learningApi.startTopicQuiz(topicId);
+      setQuizData(data);
+      setQuizAnswers({});
+      if (data?.progress) {
+        setProgress(prev => mergeProgress(prev, data.progress));
+      }
+    } catch (err) {
+      setQuizError(err?.body?.message || err?.message || 'Unable to start the quiz.');
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const handleOptionChange = (question, optionId) => {
+    const key = question.item_id;
+    setQuizAnswers(prev => {
+      if (question.qtype === 'multi') {
+        const current = Array.isArray(prev[key]) ? prev[key] : [];
+        const next = current.includes(optionId)
+          ? current.filter(value => value !== optionId)
+          : [...current, optionId];
+        return { ...prev, [key]: next };
+      }
+      return { ...prev, [key]: optionId };
+    });
+  };
+
+  const isOptionSelected = (question, optionId) => {
+    const value = quizAnswers[question.item_id];
+    if (question.qtype === 'multi') {
+      return Array.isArray(value) && value.includes(optionId);
+    }
+    return value === optionId;
+  };
+
+  const allQuestionsAnswered = quizData
+    ? quizData.questions.every(question => {
+        const value = quizAnswers[question.item_id];
+        if (question.qtype === 'multi') {
+          return Array.isArray(value) && value.length > 0;
+        }
+        return typeof value === 'string' && value;
+      })
+    : false;
+
+  const handleSubmitQuiz = async () => {
+    if (!quizData) return;
+    setQuizLoading(true);
+    setQuizError(null);
+    try {
+      const result = await learningApi.submitTopicQuiz(topicId, quizData.quiz_session_id, quizAnswers);
+      setQuizResult(result);
+      setQuizData(null);
+      setQuizAnswers({});
+      if (result?.progress) {
+        setProgress(prev => mergeProgress(prev, result.progress));
+      }
+    } catch (err) {
+      setQuizError(err?.body?.message || err?.message || 'Unable to submit the quiz.');
+    } finally {
+      setQuizLoading(false);
     }
   };
 
@@ -664,6 +802,315 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 </div>
               </div>
             </section>
+
+            {isApiSource && (
+              <section style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 20,
+                padding: 28,
+                boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+              }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Topic knowledge base</h3>
+                  <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
+                    Search curated evidence tied to this topic to strengthen your understanding.
+                  </p>
+                </div>
+                <form
+                  onSubmit={handleRagSubmit}
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}
+                >
+                  <input
+                    type="text"
+                    value={ragQuery}
+                    onChange={(event) => setRagQuery(event.target.value)}
+                    placeholder="e.g. stakeholder transparency"
+                    style={{
+                      flex: '1 1 260px',
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      border: '1px solid #dbeafe',
+                      fontSize: 14,
+                      background: '#f8fafc',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={ragLoading}
+                    style={{
+                      padding: '12px 18px',
+                      borderRadius: 12,
+                      border: 'none',
+                      background: ragLoading ? '#93c5fd' : '#2563eb',
+                      color: '#fff',
+                      fontWeight: 600,
+                      cursor: ragLoading ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    {ragLoading ? 'Searching…' : 'Search'}
+                  </button>
+                </form>
+                {ragError && (
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      background: '#fee2e2',
+                      color: '#991b1b',
+                      fontSize: 13,
+                    }}
+                  >
+                    {ragError}
+                  </div>
+                )}
+                {ragLoading ? (
+                  <div style={{ color: '#64748b', fontSize: 14 }}>Gathering the most relevant passages…</div>
+                ) : ragResults.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {ragResults.map((result, idx) => (
+                      <div
+                        key={result.chunk_id || idx}
+                        style={{
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 16,
+                          padding: 20,
+                          background: '#f8fafc',
+                          boxShadow: '0 6px 18px rgba(15,23,42,0.08)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                            {result.document_title || `Supporting detail #${(result.chunk_index ?? idx) + 1}`}
+                          </div>
+                          <span style={{ fontSize: 12, color: '#64748b' }}>
+                            Match score {(Math.min(1, Math.max(0, result.score || 0)) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <p style={{ margin: '10px 0 0', lineHeight: 1.6, color: '#334155' }}>{result.content}</p>
+                        {result.source && (
+                          <a
+                            href={result.source}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              marginTop: 12,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              fontSize: 13,
+                              color: '#1d4ed8',
+                              textDecoration: 'none'
+                            }}
+                          >
+                            View source ↗
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, color: '#94a3b8', fontSize: 14 }}>
+                    {ragQuery ? 'No supporting passages matched this prompt yet.' : 'Ask a question or search a keyword to surface context-rich references.'}
+                  </p>
+                )}
+              </section>
+            )}
+
+            {isApiSource && (
+              <section style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 20,
+                padding: 28,
+                boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Topic quiz</h3>
+                    <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
+                      Earn at least {passThresholdLabel} to mark the topic as complete.
+                    </p>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>
+                    Best score: {formatScore(progress.bestScore)} · Attempts: {progress.attemptCount}
+                  </div>
+                </div>
+
+                {quizError && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    background: '#fee2e2',
+                    color: '#991b1b',
+                    fontSize: 13,
+                  }}>
+                    {quizError}
+                  </div>
+                )}
+
+                {quizResult && (
+                  <div style={{
+                    marginTop: 16,
+                    padding: '16px 18px',
+                    borderRadius: 16,
+                    background: quizResult.passed ? '#ecfdf5' : '#fef2f2',
+                    border: `1px solid ${quizResult.passed ? 'rgba(16,185,129,0.3)' : 'rgba(248,113,113,0.3)'}`,
+                    color: quizResult.passed ? '#047857' : '#b91c1c',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    fontSize: 14,
+                  }}>
+                    <strong>Latest attempt: {formatScore(quizResult.score)}</strong>
+                    <span>
+                      {quizResult.passed
+                        ? 'Great work! You reached the required threshold.'
+                        : 'Keep practising—review the topic and try again.'}
+                    </span>
+                    <span style={{ fontSize: 12, color: quizResult.passed ? '#059669' : '#b45309' }}>
+                      Best score so far: {formatScore(quizResult.best_score)} · Attempts: {quizResult.attempt_count}
+                    </span>
+                  </div>
+                )}
+
+                {quizData ? (
+                  <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    {quizData.questions.map((question) => (
+                      <div
+                        key={question.item_id}
+                        style={{
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 18,
+                          padding: 20,
+                          background: '#f8fafc',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
+                          <h4 style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>Question {question.order}</h4>
+                          <span style={{ fontSize: 12, color: '#94a3b8' }}>
+                            {question.qtype === 'multi' ? 'Select all that apply' : 'Choose one answer'}
+                          </span>
+                        </div>
+                        <p style={{ margin: '10px 0 16px', color: '#334155', lineHeight: 1.6 }}>{question.stem}</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {(question.choices || []).map((choice) => (
+                            <label
+                              key={choice.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10,
+                                padding: '12px 14px',
+                                borderRadius: 12,
+                                border: isOptionSelected(question, choice.id) ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                                background: isOptionSelected(question, choice.id) ? 'rgba(37,99,235,0.08)' : '#fff',
+                                cursor: quizLoading ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <input
+                                type={question.qtype === 'multi' ? 'checkbox' : 'radio'}
+                                name={`quiz-${question.item_id}`}
+                                value={choice.id}
+                                checked={isOptionSelected(question, choice.id)}
+                                onChange={() => handleOptionChange(question, choice.id)}
+                                disabled={quizLoading}
+                                style={{ width: 16, height: 16 }}
+                              />
+                              <span style={{ fontSize: 14, color: '#0f172a' }}>
+                                {choice.label || choice.title || choice.text || choice.id}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                      <span style={{ fontSize: 13, color: '#64748b' }}>
+                        {allQuestionsAnswered ? 'Ready when you are!' : 'Answer every question to enable submission.'}
+                      </span>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuizData(null);
+                            setQuizAnswers({});
+                          }}
+                          disabled={quizLoading}
+                          style={{
+                            padding: '10px 16px',
+                            borderRadius: 10,
+                            border: '1px solid #cbd5f5',
+                            background: '#fff',
+                            color: '#1e3a8a',
+                            fontWeight: 600,
+                            cursor: quizLoading ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSubmitQuiz}
+                          disabled={quizLoading || !allQuestionsAnswered}
+                          style={{
+                            padding: '10px 18px',
+                            borderRadius: 10,
+                            border: 'none',
+                            background: quizLoading || !allQuestionsAnswered ? '#93c5fd' : '#2563eb',
+                            color: '#fff',
+                            fontWeight: 600,
+                            cursor: quizLoading || !allQuestionsAnswered ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {quizLoading ? 'Submitting…' : 'Submit quiz'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    marginTop: 20,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 16,
+                    border: '1px dashed #dbeafe',
+                    borderRadius: 16,
+                    padding: '18px 20px',
+                    background: '#f8fafc',
+                  }}>
+                    <div style={{ fontSize: 14, color: '#475569', maxWidth: 480 }}>
+                      {isEligibleForQuiz
+                        ? 'Take the short quiz to lock in your learning. You can retry as many times as you like.'
+                        : 'Review the topic content first, then come back for a quick knowledge check.'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStartQuiz}
+                      disabled={!isEligibleForQuiz || quizLoading}
+                      style={{
+                        padding: '12px 18px',
+                        borderRadius: 12,
+                        border: 'none',
+                        background: !isEligibleForQuiz || quizLoading ? '#cbd5f5' : '#2563eb',
+                        color: '#fff',
+                        fontWeight: 600,
+                        cursor: !isEligibleForQuiz || quizLoading ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 8px 18px rgba(37,99,235,0.25)',
+                      }}
+                    >
+                      {progress.quizState === 'pending' ? 'Resume quiz' : 'Start quiz'}
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
 
             <section style={{
               backgroundColor: '#ffffff',

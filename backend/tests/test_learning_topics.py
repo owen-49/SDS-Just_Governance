@@ -21,7 +21,11 @@ from app.deps.auth import get_current_user  # noqa: E402
 from app.models import (  # noqa: E402
     Base,
     Board,
+    Document,
+    DocumentChunk,
     Module,
+    Question,
+    QuestionTopic,
     Topic,
     TopicContent,
     User,
@@ -78,6 +82,57 @@ class LearningTopicFlowTest(unittest.IsolatedAsyncioTestCase):
                     "Checklist": {"url": "https://example.com/checklist", "title": "Readiness Checklist"},
                 },
             )
+            document = Document(
+                id=uuid.uuid4(),
+                title="Trust Building Guide",
+                source="https://example.com/guide",
+                topic_id=topic.id,
+            )
+            chunk_one = DocumentChunk(
+                document_id=document.id,
+                chunk_index=0,
+                content="Building trust requires transparency and active listening.",
+            )
+            chunk_two = DocumentChunk(
+                document_id=document.id,
+                chunk_index=1,
+                content="Transparent decision making boosts stakeholder confidence.",
+            )
+
+            question_choices = [
+                {"id": "A", "label": "Share updates openly"},
+                {"id": "B", "label": "Limit information"},
+                {"id": "C", "label": "Ignore feedback"},
+            ]
+            questions = [
+                Question(
+                    id=uuid.uuid4(),
+                    qtype="single",
+                    stem="What is the most effective first step when rebuilding trust?",
+                    choices=question_choices,
+                    answer_key={"correct_options": ["A"]},
+                    explanation="Openness builds credibility.",
+                ),
+                Question(
+                    id=uuid.uuid4(),
+                    qtype="single",
+                    stem="Which action erodes trust the most?",
+                    choices=question_choices,
+                    answer_key={"correct_options": ["B"]},
+                ),
+                Question(
+                    id=uuid.uuid4(),
+                    qtype="single",
+                    stem="What habit sustains trust long term?",
+                    choices=question_choices,
+                    answer_key={"correct_options": ["A"]},
+                ),
+            ]
+
+            question_topics = [
+                QuestionTopic(question_id=q.id, topic_id=topic.id) for q in questions
+            ]
+
             progress = UserTopicProgress(
                 user_id=self.user.id,
                 topic_id=topic.id,
@@ -86,7 +141,22 @@ class LearningTopicFlowTest(unittest.IsolatedAsyncioTestCase):
                 last_score=Decimal("0.82"),
             )
 
-            session.add_all([self.user, board, module, topic, topic_extra, topic_content, progress])
+            session.add_all(
+                [
+                    self.user,
+                    board,
+                    module,
+                    topic,
+                    topic_extra,
+                    topic_content,
+                    document,
+                    chunk_one,
+                    chunk_two,
+                    *questions,
+                    *question_topics,
+                    progress,
+                ]
+            )
             await session.commit()
 
             self.board_id = str(board.id)
@@ -176,6 +246,45 @@ class LearningTopicFlowTest(unittest.IsolatedAsyncioTestCase):
             assert progress is not None
             self.assertEqual(progress.progress_status, "in_progress")
             self.assertIsNotNone(progress.last_visited_at)
+
+    async def test_topic_rag_search_returns_ranked_chunks(self) -> None:
+        response = await self.client.get(
+            f"/api/v1/topics/{self.topic_id}/rag/search",
+            params={"query": "transparency trust", "limit": 5},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()["data"]
+        self.assertEqual(body["topic_id"], self.topic_id)
+        self.assertGreaterEqual(len(body["results"]), 1)
+        scores = [result["score"] for result in body["results"]]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+
+    async def test_topic_quiz_flow(self) -> None:
+        start_resp = await self.client.post(f"/api/v1/topics/{self.topic_id}/quiz/start")
+        self.assertEqual(start_resp.status_code, 200)
+        start_body = start_resp.json()["data"]
+        self.assertEqual(len(start_body["questions"]), 3)
+        session_id = start_body["quiz_session_id"]
+
+        answers = {}
+        for question in start_body["questions"]:
+            choices = question["choices"]
+            answers[question["item_id"]] = choices[0]["id"]
+
+        submit_resp = await self.client.post(
+            f"/api/v1/topics/{self.topic_id}/quiz/{session_id}/submit",
+            json={"answers": answers},
+        )
+        self.assertEqual(submit_resp.status_code, 200)
+        submit_body = submit_resp.json()["data"]
+        self.assertAlmostEqual(submit_body["score"], 1.0, places=4)
+        self.assertTrue(submit_body["passed"])
+
+        async with self.SessionLocal() as session:
+            refreshed = await session.get(UserTopicProgress, (self.user.id, uuid.UUID(self.topic_id)))
+            assert refreshed is not None
+            self.assertEqual(refreshed.quiz_state, "completed")
+            self.assertEqual(float(refreshed.last_score), 1.0)
 
 
 if __name__ == "__main__":
