@@ -34,7 +34,7 @@ class TimestampMixin:
     )
 
 # 统一 UUID 主键（数据库生成）
-# ！需要为Post过热时SQL手动开启扩展：CREATE EXTENSION IF NOT EXISTS pgcrypto;
+# ！需要为 PostgreSQL 手动开启扩展：CREATE EXTENSION IF NOT EXISTS pgcrypto;
 def uuid_pk_db() -> sa.TextClause:
     return sa.text("gen_random_uuid()")          # sqlalchemy.text() 方法，用来写“原生 SQL 表达式”。
 

@@ -1,14 +1,17 @@
 # backend/app/models/boards.py
 from __future__ import annotations
 import uuid
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy import String, Integer, Text, ForeignKey, Numeric
+from sqlalchemy import String, Integer, Text, ForeignKey, Numeric, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin, uuid_pk_db
+
+if TYPE_CHECKING:
+    from .progress import UserTopicProgress
 
 class Board(Base):
     __tablename__ = "boards"
@@ -40,10 +43,14 @@ class Topic(Base):
         Numeric(3, 2), server_default=sa.text("0.80"), nullable=False
     )
     sort_order: Mapped[int] = mapped_column(sa.Integer, server_default=sa.text("0"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=sa.text("true"), nullable=False)
 
     module: Mapped["Module"] = relationship(back_populates="topics")
     content: Mapped[Optional["TopicContent"]] = relationship(
         back_populates="topic", cascade="all, delete-orphan", uselist=False
+    )
+    progress_entries: Mapped[List["UserTopicProgress"]] = relationship(
+        back_populates="topic"
     )
 
 class TopicContent(TimestampMixin, Base):
