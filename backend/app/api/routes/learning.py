@@ -7,6 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -22,8 +23,13 @@ from app.models import (
     UserTopicProgress,
 )
 from app.schemas.api_response import ok
+from app.services.topic_quiz import TopicQuizService
+from app.services.topic_rag import TopicRAGService
 
 router = APIRouter(prefix="/api/v1", tags=["learning"])
+
+rag_service = TopicRAGService()
+quiz_service = TopicQuizService()
 
 
 def _validate_order(order: str) -> str:
@@ -105,6 +111,26 @@ def _normalize_resources(resources: Any) -> list[dict[str, Any]]:
         return [{"title": resources, "url": resources}]
 
     return normalized
+
+
+def _progress_payload(progress: UserTopicProgress | None) -> dict[str, Any]:
+    return {
+        "progress_status": progress.progress_status if progress else "not_started",
+        "last_score": _decimal_to_float(progress.last_score) if progress else None,
+        "attempt_count": progress.attempt_count if progress else 0,
+        "best_score": _decimal_to_float(progress.best_score) if progress else None,
+        "last_quiz_session_id": str(progress.last_quiz_session_id)
+        if progress and progress.last_quiz_session_id
+        else None,
+        "quiz_state": progress.quiz_state if progress else "none",
+        "marked_complete": bool(progress.marked_complete) if progress else False,
+        "completed_at": _datetime_to_iso(progress.completed_at) if progress else None,
+        "last_visited_at": _datetime_to_iso(progress.last_visited_at) if progress else None,
+    }
+
+
+class QuizSubmission(BaseModel):
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.get("/boards")
@@ -269,12 +295,7 @@ async def get_topic_detail(
             "pass_threshold": _decimal_to_float(topic.pass_threshold),
             "is_active": topic.is_active,
         },
-        "progress_summary": {
-            "progress_status": progress.progress_status if progress else "not_started",
-            "best_score": _decimal_to_float(progress.best_score) if progress else None,
-            "last_score": _decimal_to_float(progress.last_score) if progress else None,
-            "marked_complete": bool(progress.marked_complete) if progress else False,
-        },
+        "progress_summary": _progress_payload(progress),
     }
     return ok(data=data, request=request)
 
@@ -324,16 +345,90 @@ async def get_topic_progress(
 
     progress = await session.get(UserTopicProgress, (user.id, topic_id))
 
+    data = _progress_payload(progress)
+    return ok(data=data, request=request)
+
+
+@router.get("/topics/{topic_id}/rag/search")
+async def topic_rag_search(
+    topic_id: UUID,
+    request: Request,
+    query: str = Query(..., min_length=2, description="Search query"),
+    limit: int = Query(5, ge=1, le=20),
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    del user
+    topic = await session.get(Topic, topic_id)
+    if not topic or not topic.is_active:
+        raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
+
+    results = await rag_service.search(session, topic_id, query, limit=limit)
+    await session.commit()
+
+    payload = {
+        "topic_id": str(topic_id),
+        "query": query,
+        "results": [result.as_payload() for result in results],
+    }
+    return ok(data=payload, request=request)
+
+
+@router.post("/topics/{topic_id}/quiz/start")
+async def start_topic_quiz(
+    topic_id: UUID,
+    request: Request,
+    limit: int | None = Query(None, ge=1, le=20),
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    quiz_session, questions = await quiz_service.start_quiz(
+        session,
+        user=user,
+        topic_id=topic_id,
+        question_limit=limit,
+    )
+    await session.commit()
+
+    topic = await session.get(Topic, topic_id)
+    progress = await session.get(UserTopicProgress, (user.id, topic_id))
+
     data = {
-        "progress_status": progress.progress_status if progress else "not_started",
-        "last_score": _decimal_to_float(progress.last_score) if progress else None,
-        "attempt_count": progress.attempt_count if progress else 0,
-        "best_score": _decimal_to_float(progress.best_score) if progress else None,
-        "last_quiz_session_id": str(progress.last_quiz_session_id) if progress and progress.last_quiz_session_id else None,
-        "quiz_state": progress.quiz_state if progress else "none",
-        "marked_complete": bool(progress.marked_complete) if progress else False,
-        "completed_at": _datetime_to_iso(progress.completed_at) if progress else None,
-        "last_visited_at": _datetime_to_iso(progress.last_visited_at) if progress else None,
+        "quiz_session_id": str(quiz_session.id),
+        "topic_id": str(topic_id),
+        "pass_threshold": _decimal_to_float(topic.pass_threshold) if topic else None,
+        "questions": [question.as_payload() for question in questions],
+        "progress": _progress_payload(progress),
+    }
+    return ok(data=data, request=request)
+
+
+@router.post("/topics/{topic_id}/quiz/{session_id}/submit")
+async def submit_topic_quiz(
+    topic_id: UUID,
+    session_id: UUID,
+    payload: QuizSubmission,
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    summary = await quiz_service.submit(
+        session,
+        user=user,
+        topic_id=topic_id,
+        session_id=session_id,
+        answers=payload.answers,
+    )
+    await session.commit()
+
+    progress = await session.get(UserTopicProgress, (user.id, topic_id))
+    topic = await session.get(Topic, topic_id)
+
+    data = summary.as_payload() | {
+        "topic_id": str(topic_id),
+        "quiz_session_id": str(session_id),
+        "pass_threshold": _decimal_to_float(topic.pass_threshold) if topic else None,
+        "progress": _progress_payload(progress),
     }
     return ok(data=data, request=request)
 

@@ -35,4 +35,4 @@ class DocumentChunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    # embedding 留空
+    embedding: Mapped[Optional[list[float]]] = mapped_column(JSONB)

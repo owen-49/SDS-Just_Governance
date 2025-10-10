@@ -184,6 +184,26 @@ async function getTopicProgress(topicId) {
   return unwrap(body);
 }
 
+async function searchTopicRag(topicId, query, { limit = 5 } = {}) {
+  const search = new URLSearchParams({ query, limit: String(limit) });
+  const body = await request(`/api/v1/topics/${topicId}/rag/search?${search.toString()}`);
+  return unwrap(body);
+}
+
+async function startTopicQuiz(topicId, { limit } = {}) {
+  const search = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+  const body = await request(`/api/v1/topics/${topicId}/quiz/start${search}`);
+  return unwrap(body);
+}
+
+async function submitTopicQuiz(topicId, sessionId, answers) {
+  const body = await request(`/api/v1/topics/${topicId}/quiz/${sessionId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
+  });
+  return unwrap(body);
+}
+
 async function visitTopic(topicId) {
   const body = await request(`/api/v1/topics/${topicId}/visit`, { method: 'POST' });
   return unwrap(body);
@@ -319,6 +339,9 @@ export const learningApi = {
   getTopicDetail,
   getTopicContent,
   getTopicProgress,
+  searchTopicRag,
+  startTopicQuiz,
+  submitTopicQuiz,
   visitTopic,
   completeTopic,
   getProgressOverview,
