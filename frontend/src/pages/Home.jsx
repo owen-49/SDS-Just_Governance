@@ -8,7 +8,6 @@ import { dbApi } from '../services/localDb';
 import { sections as fallbackSections } from '../constants/structure';
 import { aiAsk } from '../services/api';
 import { learningApi } from '../services/learning';
-import { globalResources } from '../constants/globalResources';
 
 function buildTopicIndex(structure) {
   const index = {};
@@ -556,9 +555,9 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               fontWeight: '500',
               flexWrap: 'wrap'
             }}>
-              <span>{section?.name}</span>
+              <span>{section?.name?.replace(/^📚\s*/, '')}</span>
               <span style={{ color: '#cbd5e1' }}>→</span>
-              <span>{module?.name}</span>
+              <span>{module?.name?.replace(/^📦\s*/, '')}</span>
             </div>
           </div>
           
@@ -718,7 +717,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                       letterSpacing: 0.4,
                       textTransform: 'uppercase'
                     }}>
-                      {section.name}
+                      {section.name.replace(/^📚\s*/, '')}
                     </span>
                   )}
                   {module?.name && (
@@ -730,7 +729,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                       letterSpacing: 0.4,
                       textTransform: 'uppercase'
                     }}>
-                      {module.name}
+                      {module.name.replace(/^📦\s*/, '')}
                     </span>
                   )}
                 </div>
@@ -811,7 +810,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
               }}>
                 <div style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Topic knowledge base</h3>
+                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a', textAlign: 'left' }}>Topic knowledge base</h3>
                   <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
                     Search curated evidence tied to this topic to strengthen your understanding.
                   </p>
@@ -929,7 +928,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Topic quiz</h3>
+                    <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a', textAlign: 'left' }}>Topic quiz</h3>
                     <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
                       Earn at least {passThresholdLabel} to mark the topic as complete.
                     </p>
@@ -1113,16 +1112,81 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
             )}
 
             <section style={{
-              backgroundColor: '#ffffff',
-              borderRadius: 20,
-              padding: 28,
-              boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: 24,
+              padding: 32,
+              boxShadow: '0 12px 30px rgba(15,23,42,0.08)',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
-              <div style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Detailed content</h3>
-                <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Review the foundational concepts before moving into discussion or practice.</p>
+              {/* 装饰性背景元素 */}
+              <div style={{
+                position: 'absolute',
+                top: -100,
+                right: -100,
+                width: 300,
+                height: 300,
+                background: 'radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%)',
+                borderRadius: '50%',
+                pointerEvents: 'none'
+              }} />
+              
+              <div style={{ 
+                marginBottom: 24, 
+                position: 'relative',
+                paddingBottom: 16,
+                borderBottom: '2px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
+                  }}>
+                    📖
+                  </div>
+                  <h3 style={{ 
+                    margin: 0, 
+                    fontSize: 24, 
+                    color: '#0f172a', 
+                    textAlign: 'left',
+                    fontWeight: 700,
+                    letterSpacing: -0.3
+                  }}>
+                    Detailed content
+                  </h3>
+                </div>
+                <p style={{ 
+                  margin: '0 0 0 52px', 
+                  color: '#64748b', 
+                  fontSize: 15,
+                  lineHeight: 1.6
+                }}>
+                  Review the foundational concepts before moving into discussion or practice.
+                </p>
               </div>
-              <div className="ai-message-content">
+              
+              <div 
+                className="ai-message-content" 
+                style={{
+                  position: 'relative',
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  padding: '28px 32px',
+                  boxShadow: '0 4px 16px rgba(15,23,42,0.04)',
+                  border: '1px solid #f1f5f9',
+                  lineHeight: 1.8,
+                  fontSize: 16,
+                  color: '#1e293b'
+                }}
+              >
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {contentMarkdown}
                 </ReactMarkdown>
@@ -1138,7 +1202,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 boxShadow: '0 18px 35px rgba(15,23,42,0.35)'
               }}>
                 <div style={{ marginBottom: 20 }}>
-                  <h3 style={{ margin: 0, fontSize: 22 }}>Key takeaways</h3>
+                  <h3 style={{ margin: 0, fontSize: 22, textAlign: 'left' }}>Key takeaways</h3>
                   <p style={{ margin: '8px 0 0', fontSize: 14, color: 'rgba(226,232,240,0.75)' }}>Focus on these core points to unlock the next modules.</p>
                 </div>
                 <div style={{
@@ -1176,7 +1240,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                 boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
               }}>
                 <div style={{ marginBottom: 16 }}>
-                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Apply what you learn</h3>
+                  <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a', textAlign: 'left' }}>Apply what you learn</h3>
                   <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Reinforce understanding with quick checks and scenario-based practice.</p>
                 </div>
                 <div style={{
@@ -1233,81 +1297,114 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               boxShadow: '0 12px 30px rgba(15,23,42,0.08)'
             }}>
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Supporting resources</h3>
+                <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a', textAlign: 'left' }}>Supporting resources</h3>
                 <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Continue your exploration with curated reads and references.</p>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {/* 主题特定的资源 */}
-                {resources.map((resource, idx) => (
-                  <a
-                    key={`topic-resource-${idx}`}
-                    href={resource.url || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '16px 18px',
-                      borderRadius: 14,
-                      border: '1px solid #e2e8f0',
-                      textDecoration: 'none',
-                      color: '#0f172a',
-                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                      boxShadow: '0 6px 14px rgba(15,23,42,0.06)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.12)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 6px 14px rgba(15,23,42,0.06)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontWeight: 600, fontSize: 15 }}>{resource.title || 'Resource link'}</span>
-                      <span style={{ fontSize: 13, color: '#64748b' }}>{resource.source || 'External reference'}</span>
-                    </div>
-                    <span style={{ fontSize: 18, color: '#2563eb' }}>↗</span>
-                  </a>
-                ))}
-                
-                {/* 全局资源 - 从配置文件读取 */}
-                {globalResources.map((resource, idx) => (
-                  <a
-                    key={`global-resource-${idx}`}
-                    href={resource.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '16px 18px',
-                      borderRadius: 14,
-                      border: '1px solid #e2e8f0',
-                      textDecoration: 'none',
-                      color: '#0f172a',
-                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                      boxShadow: '0 6px 14px rgba(15,23,42,0.06)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(15,23,42,0.12)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 6px 14px rgba(15,23,42,0.06)';
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span style={{ fontWeight: 600, fontSize: 15 }}>{resource.title}</span>
-                      <span style={{ fontSize: 13, color: '#64748b' }}>{resource.source}</span>
-                    </div>
-                    <span style={{ fontSize: 18, color: '#2563eb' }}>↗</span>
-                  </a>
-                ))}
+                {resources.length > 0 ? resources.map((resource, idx) => {
+                  // 根据资源类型选择图标和颜色
+                  const getResourceIcon = (type) => {
+                    const iconMap = {
+                      'video': { icon: '🎥', color: '#dc2626', bg: '#fee2e2' },
+                      'pdf': { icon: '📄', color: '#ea580c', bg: '#ffedd5' },
+                      'webpage': { icon: '🌐', color: '#2563eb', bg: '#dbeafe' },
+                      'article': { icon: '📰', color: '#7c3aed', bg: '#ede9fe' },
+                      'book': { icon: '📚', color: '#059669', bg: '#d1fae5' },
+                    };
+                    return iconMap[type?.toLowerCase()] || { icon: '📎', color: '#64748b', bg: '#f1f5f9' };
+                  };
+                  
+                  const { icon, color, bg } = getResourceIcon(resource.type);
+                  
+                  return (
+                    <a
+                      key={`topic-resource-${idx}`}
+                      href={resource.url || '#'}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '18px 20px',
+                        borderRadius: 16,
+                        border: '1px solid #e2e8f0',
+                        textDecoration: 'none',
+                        color: '#0f172a',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 12px rgba(15,23,42,0.06)',
+                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                        e.currentTarget.style.boxShadow = '0 12px 28px rgba(37,99,235,0.15)';
+                        e.currentTarget.style.borderColor = '#2563eb';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(15,23,42,0.06)';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1 }}>
+                        <div style={{ 
+                          fontSize: 24, 
+                          width: 48, 
+                          height: 48, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          borderRadius: 12,
+                          backgroundColor: bg,
+                          flexShrink: 0
+                        }}>
+                          {icon}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span style={{ fontWeight: 600, fontSize: 15, color: '#0f172a' }}>
+                            {resource.title || 'Resource link'}
+                          </span>
+                          <span style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ 
+                              padding: '2px 8px', 
+                              borderRadius: 6, 
+                              backgroundColor: bg,
+                              color: color,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.3
+                            }}>
+                              {resource.type || 'Link'}
+                            </span>
+                            {resource.source && <span>• {resource.source}</span>}
+                          </span>
+                        </div>
+                      </div>
+                      <span style={{ 
+                        fontSize: 20, 
+                        color: '#2563eb',
+                        transition: 'transform 0.3s ease',
+                        flexShrink: 0
+                      }}>
+                        ↗
+                      </span>
+                    </a>
+                  );
+                }) : (
+                  <div style={{
+                    padding: '24px',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    fontSize: 14,
+                    borderRadius: 12,
+                    border: '1px dashed #e2e8f0',
+                    background: '#f8fafc'
+                  }}>
+                    📚 No additional resources available for this topic yet
+                  </div>
+                )}
               </div>
             </section>
 
@@ -1320,7 +1417,7 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Progress tracker</h3>
+                    <h3 style={{ margin: 0, fontSize: 22, color: '#0f172a', textAlign: 'left' }}>Progress tracker</h3>
                     <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>Keep tabs on your learning momentum.</p>
                   </div>
                   <span style={{
