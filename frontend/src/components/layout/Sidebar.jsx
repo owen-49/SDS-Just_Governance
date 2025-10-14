@@ -105,7 +105,7 @@ export default function Sidebar({
                 onClick={() => !query && onToggleSection(sec.id)}
                 title={sec.name}
               >
-                <span style={{ fontWeight: 600 }}>📚 {sec.name}</span>
+                <span style={{ fontWeight: 600, textAlign: 'left' }}>{sec.name}</span>
                 <span>{(ui.sectionsOpen?.[sec.id] || query) ? '▾' : '▸'}</span>
               </div>
 
@@ -120,7 +120,7 @@ export default function Sidebar({
                         onClick={() => !query && onToggleModule(mod.id)}
                         title={mod.name}
                       >
-                        <span>📦 {mod.name}</span>
+                        <span style={{ textAlign: 'left' }}>{mod.name}</span>
                         <span>{(ui.modulesOpen?.[mod.id] || query) ? '▾' : '▸'}</span>
                       </div>
 
