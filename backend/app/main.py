@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.old_routes.chat import router as chat_router
-from app.api.old_routes.assessment import router as assessment_router
+from app.api.routes.assessment import router as assessment_router
 from app.core.exceptions.exceptions import setup_exception_handlers
 from app.core.logging.logging_config import setup_logging
 from app.middleware.access_log import AccessLogMiddleware
