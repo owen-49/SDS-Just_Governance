@@ -7,6 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,14 +17,19 @@ from app.core.exceptions.exceptions import BizError
 from app.deps.auth import get_current_user
 from app.models import (
     Board,
+    LearningTopic,
+    LearningTopicContent,
     Module,
-    Topic,
-    TopicContent,
     UserTopicProgress,
 )
 from app.schemas.api_response import ok
+from app.services.topic_quiz import TopicQuizService
+from app.services.topic_rag import TopicRAGService
 
 router = APIRouter(prefix="/api/v1", tags=["learning"])
+
+rag_service = TopicRAGService()
+quiz_service = TopicQuizService()
 
 
 def _validate_order(order: str) -> str:
@@ -64,6 +70,67 @@ def _datetime_to_iso(value: datetime | None) -> str | None:
     else:
         value = value.astimezone(timezone.utc)
     return value.isoformat()
+
+def _normalize_resources(resources: Any) -> list[dict[str, Any]]:
+    """Ensure topic resources are always rendered as a list of {title, url}."""
+
+    if not resources:
+        return []
+
+    normalized: list[dict[str, Any]] = []
+
+    if isinstance(resources, dict):
+        for title, value in resources.items():
+            if isinstance(value, dict):
+                url = value.get("url") or value.get("href")
+                label = value.get("title") or value.get("label") or title
+            else:
+                url = value
+                label = title
+            if not url:
+                continue
+            normalized.append({"title": label, "url": url})
+        return normalized
+
+    if isinstance(resources, list):
+        for idx, item in enumerate(resources, start=1):
+            if isinstance(item, dict):
+                url = item.get("url") or item.get("href")
+                title = item.get("title") or item.get("label") or f"Resource {idx}"
+            elif isinstance(item, str):
+                url = item
+                title = item
+            else:
+                continue
+            if not url:
+                continue
+            normalized.append({"title": title, "url": url})
+        return normalized
+
+    if isinstance(resources, str):
+        return [{"title": resources, "url": resources}]
+
+    return normalized
+
+
+def _progress_payload(progress: UserTopicProgress | None) -> dict[str, Any]:
+    return {
+        "progress_status": progress.progress_status if progress else "not_started",
+        "last_score": _decimal_to_float(progress.last_score) if progress else None,
+        "attempt_count": progress.attempt_count if progress else 0,
+        "best_score": _decimal_to_float(progress.best_score) if progress else None,
+        "last_quiz_session_id": str(progress.last_quiz_session_id)
+        if progress and progress.last_quiz_session_id
+        else None,
+        "quiz_state": progress.quiz_state if progress else "none",
+        "marked_complete": bool(progress.marked_complete) if progress else False,
+        "completed_at": _datetime_to_iso(progress.completed_at) if progress else None,
+        "last_visited_at": _datetime_to_iso(progress.last_visited_at) if progress else None,
+    }
+
+
+class QuizSubmission(BaseModel):
+    answers: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.get("/boards")
@@ -173,12 +240,15 @@ async def list_topics(
 
     order = _validate_order(order)
     sort_column = _resolve_sort(sort, {
-        "sort_order": Topic.sort_order,
-        "name": Topic.name,
-        "id": Topic.id,
+        "sort_order": LearningTopic.sort_order,
+        "name": LearningTopic.name,
+        "id": LearningTopic.id,
     })
 
-    base_stmt = sa.select(Topic).where(Topic.module_id == module_id, Topic.is_active.is_(True))
+    base_stmt = sa.select(LearningTopic).where(
+        LearningTopic.module_id == module_id,
+        LearningTopic.is_active.is_(True),
+    )
     total_result = await session.execute(
         sa.select(sa.func.count()).select_from(base_stmt.subquery())
     )
@@ -215,7 +285,7 @@ async def get_topic_detail(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -228,12 +298,7 @@ async def get_topic_detail(
             "pass_threshold": _decimal_to_float(topic.pass_threshold),
             "is_active": topic.is_active,
         },
-        "progress_summary": {
-            "progress_status": progress.progress_status if progress else "not_started",
-            "best_score": _decimal_to_float(progress.best_score) if progress else None,
-            "last_score": _decimal_to_float(progress.last_score) if progress else None,
-            "marked_complete": bool(progress.marked_complete) if progress else False,
-        },
+        "progress_summary": _progress_payload(progress),
     }
     return ok(data=data, request=request)
 
@@ -247,9 +312,9 @@ async def get_topic_content(
 ):
     del user
     stmt = (
-        sa.select(TopicContent, Topic)
-        .join(Topic, TopicContent.topic_id == Topic.id)
-        .where(Topic.id == topic_id)
+        sa.select(LearningTopicContent, LearningTopic)
+        .join(LearningTopic, LearningTopicContent.topic_id == LearningTopic.id)
+        .where(LearningTopic.id == topic_id)
     )
     result = await session.execute(stmt)
     row = result.first()
@@ -265,7 +330,7 @@ async def get_topic_content(
         "body_format": content.body_format,
         "body_markdown": content.body_markdown,
         "summary": content.summary,
-        "resources": content.resources or [],
+        "resources":_normalize_resources(content.resources),
     }
     return ok(data=data, request=request)
 
@@ -277,22 +342,96 @@ async def get_topic_progress(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
     progress = await session.get(UserTopicProgress, (user.id, topic_id))
 
+    data = _progress_payload(progress)
+    return ok(data=data, request=request)
+
+
+@router.get("/topics/{topic_id}/rag/search")
+async def topic_rag_search(
+    topic_id: UUID,
+    request: Request,
+    query: str = Query(..., min_length=2, description="Search query"),
+    limit: int = Query(5, ge=1, le=20),
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    del user
+    topic = await session.get(LearningTopic, topic_id)
+    if not topic or not topic.is_active:
+        raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
+
+    results = await rag_service.search(session, topic_id, query, limit=limit)
+    await session.commit()
+
+    payload = {
+        "topic_id": str(topic_id),
+        "query": query,
+        "results": [result.as_payload() for result in results],
+    }
+    return ok(data=payload, request=request)
+
+
+@router.post("/topics/{topic_id}/quiz/start")
+async def start_topic_quiz(
+    topic_id: UUID,
+    request: Request,
+    limit: int | None = Query(None, ge=1, le=20),
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    quiz_session, questions = await quiz_service.start_quiz(
+        session,
+        user=user,
+        topic_id=topic_id,
+        question_limit=limit,
+    )
+    await session.commit()
+
+    topic = await session.get(LearningTopic, topic_id)
+    progress = await session.get(UserTopicProgress, (user.id, topic_id))
+
     data = {
-        "progress_status": progress.progress_status if progress else "not_started",
-        "last_score": _decimal_to_float(progress.last_score) if progress else None,
-        "attempt_count": progress.attempt_count if progress else 0,
-        "best_score": _decimal_to_float(progress.best_score) if progress else None,
-        "last_quiz_session_id": str(progress.last_quiz_session_id) if progress and progress.last_quiz_session_id else None,
-        "quiz_state": progress.quiz_state if progress else "none",
-        "marked_complete": bool(progress.marked_complete) if progress else False,
-        "completed_at": _datetime_to_iso(progress.completed_at) if progress else None,
-        "last_visited_at": _datetime_to_iso(progress.last_visited_at) if progress else None,
+        "quiz_session_id": str(quiz_session.id),
+        "topic_id": str(topic_id),
+        "pass_threshold": _decimal_to_float(topic.pass_threshold) if topic else None,
+        "questions": [question.as_payload() for question in questions],
+        "progress": _progress_payload(progress),
+    }
+    return ok(data=data, request=request)
+
+
+@router.post("/topics/{topic_id}/quiz/{session_id}/submit")
+async def submit_topic_quiz(
+    topic_id: UUID,
+    session_id: UUID,
+    payload: QuizSubmission,
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    summary = await quiz_service.submit(
+        session,
+        user=user,
+        topic_id=topic_id,
+        session_id=session_id,
+        answers=payload.answers,
+    )
+    await session.commit()
+
+    progress = await session.get(UserTopicProgress, (user.id, topic_id))
+    topic = await session.get(LearningTopic, topic_id)
+
+    data = summary.as_payload() | {
+        "topic_id": str(topic_id),
+        "quiz_session_id": str(session_id),
+        "pass_threshold": _decimal_to_float(topic.pass_threshold) if topic else None,
+        "progress": _progress_payload(progress),
     }
     return ok(data=data, request=request)
 
@@ -304,7 +443,7 @@ async def visit_topic(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -333,21 +472,14 @@ async def complete_topic(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
     progress = await session.get(UserTopicProgress, (user.id, topic_id))
+    best_score = _decimal_to_float(progress.best_score) if progress and progress.best_score is not None else None
     threshold = _decimal_to_float(topic.pass_threshold) or 0.0
-    if not progress or progress.best_score is None:
-        raise BizError(
-            409,
-            BizCode.CONFLICT,
-            "score_below_threshold",
-            data={"pass_threshold": threshold},
-        )
 
-    best_score = _decimal_to_float(progress.best_score)
     if best_score is None or best_score < threshold:
         raise BizError(
             409,
@@ -355,8 +487,6 @@ async def complete_topic(
             "score_below_threshold",
             data={"pass_threshold": threshold},
         )
-
-    assert progress is not None
 
     if progress.marked_complete:
         raise BizError(409, BizCode.CONFLICT, "already_marked_complete")
@@ -386,17 +516,17 @@ async def progress_overview(
     boards = boards_result.scalars().unique().all()
 
     totals_result = await session.execute(
-        sa.select(Topic.module_id, sa.func.count())
-        .where(Topic.is_active.is_(True))
-        .group_by(Topic.module_id)
+        sa.select(LearningTopic.module_id, sa.func.count())
+        .where(LearningTopic.is_active.is_(True))
+        .group_by(LearningTopic.module_id)
     )
     totals = {module_id: count for module_id, count in totals_result.all()}
 
     completed_result = await session.execute(
-        sa.select(Topic.module_id, sa.func.count())
-        .join(UserTopicProgress, sa.and_(UserTopicProgress.topic_id == Topic.id, UserTopicProgress.user_id == user.id))
-        .where(Topic.is_active.is_(True), UserTopicProgress.progress_status == "completed")
-        .group_by(Topic.module_id)
+        sa.select(LearningTopic.module_id, sa.func.count())
+        .join(UserTopicProgress, sa.and_(UserTopicProgress.topic_id == LearningTopic.id, UserTopicProgress.user_id == user.id))
+        .where(LearningTopic.is_active.is_(True), UserTopicProgress.progress_status == "completed")
+        .group_by(LearningTopic.module_id)
     )
     completed = {module_id: count for module_id, count in completed_result.all()}
 

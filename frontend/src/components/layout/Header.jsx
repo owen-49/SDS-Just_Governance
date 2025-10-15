@@ -1,7 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverview, onProfile, onSignOut, user, currentTopicId, onBackToHome }) {
+  const navigate = useNavigate();
+  
   return (
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -225,7 +227,7 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
               zIndex: 10001
             }}>
               <button 
-                onClick={onProfile} 
+                onClick={() => navigate('/profile')} 
                 style={{ 
                   width: '100%', 
                   textAlign: 'left', 
@@ -235,12 +237,36 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
                   cursor: 'pointer',
                   transition: 'background 0.2s ease',
                   fontSize: '14px',
-                  color: '#374151'
+                  color: '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10
                 }}
                 onMouseOver={(e) => e.target.style.background = 'rgba(0, 0, 0, 0.04)'}
                 onMouseOut={(e) => e.target.style.background = 'transparent'}
               >
-                👤 Profile & Settings
+                <span>👤</span> <span>View Profile</span>
+              </button>
+              <button 
+                onClick={() => navigate('/settings')} 
+                style={{ 
+                  width: '100%', 
+                  textAlign: 'left', 
+                  padding: '12px 16px', 
+                  border: 'none', 
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s ease',
+                  fontSize: '14px',
+                  color: '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(0, 0, 0, 0.04)'}
+                onMouseOut={(e) => e.target.style.background = 'transparent'}
+              >
+                <span>⚙️</span> <span>Settings</span>
               </button>
               <Link 
                 to="/welcome" 

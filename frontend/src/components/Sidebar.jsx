@@ -1,7 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { sections } from '../constants/structure';
 
-export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onToggleModule, onSelectTopic, currentTopicId, user }) {
+export default function Sidebar({
+  sections = [],
+  loading = false,
+  ui,
+  onToggleCollapsed,
+  onToggleSection,
+  onToggleModule,
+  onSelectTopic,
+  currentTopicId,
+  user,
+}) {
   const collapsed = ui?.collapsed;
   // Added: topic search
   const [query, setQuery] = useState('');
@@ -24,7 +33,7 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
         return null;
       })
       .filter(Boolean);
-  }, [query]);
+  }, [query, sections]);
 
   return (
     <aside style={{
@@ -125,7 +134,11 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
             </div>
           ))}
 
-          {renderSections.length === 0 && (
+          {loading && (
+            <div style={{ color: '#94a3b8', padding: '8px 10px' }}>Loading topics…</div>
+          )}
+
+          {!loading && renderSections.length === 0 && (
             <div style={{ color: '#94a3b8', padding: '8px 10px' }}>No results</div>
           )}
         </div>

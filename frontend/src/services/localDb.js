@@ -325,8 +325,8 @@ export const dbApi = {
     // 学习信息架构
     ensure(db, 'boards', []);
     ensure(db, 'modules', []);
-    ensure(db, 'topics', []);
-    ensure(db, 'topic_contents', []);
+    ensure(db, 'learning_topics', []);
+    ensure(db, 'learning_topic_contents', []);
     // 题库与测试
     ensure(db, 'questions', []);
     ensure(db, 'question_topics', []);

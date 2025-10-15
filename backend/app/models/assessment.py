@@ -37,7 +37,7 @@ class QuestionTopic(Base):
         nullable=False
     )
     topic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("topics.id", ondelete="CASCADE"),
+        ForeignKey("learning_topics.id", ondelete="CASCADE"),
         nullable=False
     )
 
@@ -47,7 +47,7 @@ class AssessmentSession(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     kind: Mapped[str] = mapped_column(AssessmentKind, nullable=False)
-    topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("topics.id"))
+    topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("learning_topics.id"))
 
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

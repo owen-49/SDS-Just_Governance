@@ -1,7 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { sections } from '../../constants/structure';
 
-export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onToggleModule, onSelectTopic, currentTopicId, user }) {
+export default function Sidebar({
+  sections = [],
+  loading = false,
+  ui,
+  onToggleCollapsed,
+  onToggleSection,
+  onToggleModule,
+  onSelectTopic,
+  currentTopicId,
+  user,
+}) {
   const collapsed = ui?.collapsed;
   // Added: topic search
   const [query, setQuery] = useState('');
@@ -24,17 +33,44 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
         return null;
       })
       .filter(Boolean);
-  }, [query]);
+  }, [query, sections]);
 
   return (
     <aside style={{
-      width: collapsed ? 56 : 280,
-      background: 'linear-gradient(180deg, #0b1220 0%, #0f172a 100%)', color: '#e2e8f0', height: 'calc(100vh - 56px)',
-      transition: 'width .2s ease', position: 'sticky', top: 56, overflowY: 'auto', borderRight: '1px solid #0b1220'
+      width: collapsed ? 56 : 'min(280px, 100vw)',
+      background: 'linear-gradient(180deg, #0b1220 0%, #0f172a 100%)', 
+      color: '#e2e8f0', 
+      height: 'calc(100vh - 56px)',
+      transition: 'width .2s ease', 
+      position: 'sticky', 
+      top: 56, 
+      overflowY: 'auto', 
+      overflowX: 'hidden',
+      borderRight: '1px solid #0b1220',
+      zIndex: 'var(--z-sidebar)'
     }}>
-      <div style={{ padding: 12, display: 'flex', justifyContent: collapsed ? 'center' : 'space-between', alignItems: 'center' }}>
-        {!collapsed && <div style={{ fontWeight: 700, letterSpacing: .3 }}>Navigation</div>}
-        <button onClick={onToggleCollapsed} title={collapsed ? 'Expand' : 'Collapse'} style={{ background: 'transparent', color: '#e2e8f0', border: 'none', cursor: 'pointer', fontSize: 16 }}>{collapsed ? '›' : '‹'}</button>
+      <div style={{ 
+        padding: 'clamp(8px, 2vw, 12px)', 
+        display: 'flex', 
+        justifyContent: collapsed ? 'center' : 'space-between', 
+        alignItems: 'center' 
+      }}>
+        {!collapsed && <div style={{ fontWeight: 700, letterSpacing: .3, fontSize: 'clamp(13px, 2vw, 14px)' }}>Navigation</div>}
+        <button 
+          onClick={onToggleCollapsed} 
+          title={collapsed ? 'Expand' : 'Collapse'} 
+          style={{ 
+            background: 'transparent', 
+            color: '#e2e8f0', 
+            border: 'none', 
+            cursor: 'pointer', 
+            fontSize: 'clamp(14px, 3vw, 16px)',
+            padding: 8,
+            touchAction: 'manipulation'
+          }}
+        >
+          {collapsed ? '›' : '‹'}
+        </button>
       </div>
 
       {/* Search box (displayed when expanded) */}
@@ -69,7 +105,7 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
                 onClick={() => !query && onToggleSection(sec.id)}
                 title={sec.name}
               >
-                <span style={{ fontWeight: 600 }}>📚 {sec.name}</span>
+                <span style={{ fontWeight: 600, textAlign: 'left' }}>{sec.name}</span>
                 <span>{(ui.sectionsOpen?.[sec.id] || query) ? '▾' : '▸'}</span>
               </div>
 
@@ -84,7 +120,7 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
                         onClick={() => !query && onToggleModule(mod.id)}
                         title={mod.name}
                       >
-                        <span>📦 {mod.name}</span>
+                        <span style={{ textAlign: 'left' }}>{mod.name}</span>
                         <span>{(ui.modulesOpen?.[mod.id] || query) ? '▾' : '▸'}</span>
                       </div>
 
@@ -125,7 +161,11 @@ export default function Sidebar({ ui, onToggleCollapsed, onToggleSection, onTogg
             </div>
           ))}
 
-          {renderSections.length === 0 && (
+          {loading && (
+            <div style={{ color: '#94a3b8', padding: '8px 10px' }}>Loading topics…</div>
+          )}
+
+          {!loading && renderSections.length === 0 && (
             <div style={{ color: '#94a3b8', padding: '8px 10px' }}>No results</div>
           )}
         </div>

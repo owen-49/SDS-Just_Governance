@@ -1,10 +1,13 @@
 from __future__ import annotations
+import os
 import uuid
 from datetime import datetime
 import sqlalchemy as sa
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
-from sqlalchemy import MetaData, func, DateTime
+
+import sqlalchemy as sa
+from sqlalchemy import DateTime, MetaData, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # 让 Alembic 生成外键/唯一索引的名字更稳定（避免不同机器上名字不同）
@@ -34,8 +37,19 @@ class TimestampMixin:
     )
 
 # 统一 UUID 主键（数据库生成）
-# ！需要为 PostgreSQL 手动开启扩展：CREATE EXTENSION IF NOT EXISTS pgcrypto;
+# ！需要为Post过热时SQL手动开启扩展：CREATE EXTENSION IF NOT EXISTS pgcrypto;
+_SQLITE_UUID_EXPR = (
+    "lower(hex(randomblob(4))) || '-' || "
+    "lower(hex(randomblob(2))) || '-' || "
+    "lower(hex(randomblob(2))) || '-' || "
+    "lower(hex(randomblob(2))) || '-' || "
+    "lower(hex(randomblob(6)))"
+)
+
 def uuid_pk_db() -> sa.TextClause:
+    url = os.getenv("DATABASE_URL_ASYNC", "")
+    if url.startswith("sqlite"):
+        return sa.text(_SQLITE_UUID_EXPR)
     return sa.text("gen_random_uuid()")          # sqlalchemy.text() 方法，用来写“原生 SQL 表达式”。
 
 
