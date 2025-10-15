@@ -17,12 +17,14 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+JSON_VARIANT = sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), "postgresql")
+
+
 def upgrade() -> None:
-    op.add_column(
-        "document_chunks",
-        sa.Column("embedding", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    )
+    with op.batch_alter_table("document_chunks", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("embedding", JSON_VARIANT, nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("document_chunks", "embedding")
+    with op.batch_alter_table("document_chunks", schema=None) as batch_op:
+        batch_op.drop_column("embedding")
