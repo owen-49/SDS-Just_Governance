@@ -12,7 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from .content import Topic
+    from .content import LearningTopic
 
 ProgressStatusEnum = Enum(
     "not_started", "in_progress", "completed", name="progress_status"
@@ -28,7 +28,7 @@ class UserTopicProgress(TimestampMixin, Base):
     )
     topic_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("topics.id", ondelete="CASCADE"),
+        ForeignKey("learning_topics.id", ondelete="CASCADE"),
         primary_key=True,
     )
     progress_status: Mapped[str] = mapped_column(
@@ -54,4 +54,4 @@ class UserTopicProgress(TimestampMixin, Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_visited_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
-    topic: Mapped["Topic"] = relationship(back_populates="progress_entries")
+    topic: Mapped["LearningTopic"] = relationship(back_populates="progress_entries")

@@ -31,10 +31,11 @@ class Module(Base):
     sort_order: Mapped[int] = mapped_column(sa.Integer, server_default=sa.text("0"), nullable=False)
 
     board: Mapped["Board"] = relationship(back_populates="modules")
-    topics: Mapped[List["Topic"]] = relationship(back_populates="module", cascade="all, delete-orphan")
+    topics: Mapped[List["LearningTopic"]] = relationship(back_populates="module", cascade="all, delete-orphan")
 
-class Topic(Base):
-    __tablename__ = "topics"
+
+class LearningTopic(Base):
+    __tablename__ = "learning_topics"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
     module_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("modules.id", ondelete="CASCADE"), index=True, nullable=False)
@@ -46,19 +47,19 @@ class Topic(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=sa.text("true"), nullable=False)
 
     module: Mapped["Module"] = relationship(back_populates="topics")
-    content: Mapped[Optional["TopicContent"]] = relationship(
+    content: Mapped[Optional["LearningTopicContent"]] = relationship(
         back_populates="topic", cascade="all, delete-orphan", uselist=False
     )
     progress_entries: Mapped[List["UserTopicProgress"]] = relationship(
         back_populates="topic"
     )
 
-class TopicContent(TimestampMixin, Base):
-    __tablename__ = "topic_contents"
+class LearningTopicContent(TimestampMixin, Base):
+    __tablename__ = "learning_topic_contents"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
     topic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("topics.id", ondelete="CASCADE"),
+        ForeignKey("learning_topics.id", ondelete="CASCADE"),
         unique=True, index=True, nullable=False
     )
     body_format: Mapped[str] = mapped_column(String, server_default=sa.text("'markdown'"), nullable=False)
@@ -66,4 +67,4 @@ class TopicContent(TimestampMixin, Base):
     summary: Mapped[Optional[str]] = mapped_column(Text)
     resources: Mapped[Optional[dict]] = mapped_column(JSONB)
 
-    topic: Mapped["Topic"] = relationship(back_populates="content")
+    topic: Mapped["LearningTopic"] = relationship(back_populates="content")

@@ -153,16 +153,16 @@ def upgrade() -> None:
     sa.UniqueConstraint('survey_id', 'question_key', name='uq_survey_question_key')
     )
     op.create_index(op.f('ix_onboarding_survey_answers_survey_id'), 'onboarding_survey_answers', ['survey_id'], unique=False)
-    op.create_table('topics',
+    op.create_table('learning_topics',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('module_id', sa.UUID(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('pass_threshold', sa.Numeric(precision=3, scale=2), server_default=sa.text('0.80'), nullable=False),
     sa.Column('sort_order', sa.Integer(), server_default=sa.text('0'), nullable=False),
-    sa.ForeignKeyConstraint(['module_id'], ['modules.id'], name=op.f('fk_topics_module_id_modules'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_topics'))
+    sa.ForeignKeyConstraint(['module_id'], ['modules.id'], name=op.f('fk_learning_topics_module_id_modules'), ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_learning_topics'))
     )
-    op.create_index(op.f('ix_topics_module_id'), 'topics', ['module_id'], unique=False)
+    op.create_index(op.f('ix_learning_topics_module_id'), 'learning_topics', ['module_id'], unique=False)
     op.create_table('assessment_sessions',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
@@ -174,7 +174,7 @@ def upgrade() -> None:
     sa.Column('ai_summary', sa.Text(), nullable=True),
     sa.Column('ai_recommendation', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('last_question_index', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['topic_id'], ['topics.id'], name=op.f('fk_assessment_sessions_topic_id_topics')),
+    sa.ForeignKeyConstraint(['topic_id'], ['learning_topics.id'], name=op.f('fk_assessment_sessions_topic_id_learning_topics')),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_assessment_sessions_user_id_users'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_assessment_sessions'))
     )
@@ -192,7 +192,7 @@ def upgrade() -> None:
     sa.Column('summarized_upto_message_id', sa.UUID(), nullable=True),
     sa.Column('last_active_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.ForeignKeyConstraint(['topic_id'], ['topics.id'], name=op.f('fk_chat_sessions_topic_id_topics')),
+    sa.ForeignKeyConstraint(['topic_id'], ['learning_topics.id'], name=op.f('fk_chat_sessions_topic_id_learning_topics')),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_chat_sessions_user_id_users'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_chat_sessions')),
     sa.UniqueConstraint('user_id', 'topic_id', name='ux_topic_chat_once')
@@ -206,7 +206,7 @@ def upgrade() -> None:
     sa.Column('topic_id', sa.UUID(), nullable=True),
     sa.Column('document_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.ForeignKeyConstraint(['topic_id'], ['topics.id'], name=op.f('fk_documents_topic_id_topics')),
+    sa.ForeignKeyConstraint(['topic_id'], ['learning_topics.id'], name=op.f('fk_documents_topic_id_learning_topics')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_documents'))
     )
     op.create_table('onboarding_survey_options',
@@ -223,10 +223,10 @@ def upgrade() -> None:
     sa.Column('question_id', sa.UUID(), nullable=False),
     sa.Column('topic_id', sa.UUID(), nullable=False),
     sa.ForeignKeyConstraint(['question_id'], ['questions.id'], name=op.f('fk_question_topics_question_id_questions'), ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['topic_id'], ['topics.id'], name=op.f('fk_question_topics_topic_id_topics'), ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['topic_id'], ['learning_topics.id'], name=op.f('fk_question_topics_topic_id_learning_topics'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('question_id', 'topic_id', name='pk_question_topics')
     )
-    op.create_table('topic_contents',
+    op.create_table('learning_topic_contents',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('topic_id', sa.UUID(), nullable=False),
     sa.Column('body_format', sa.String(), server_default=sa.text("'markdown'"), nullable=False),
@@ -235,10 +235,10 @@ def upgrade() -> None:
     sa.Column('resources', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.ForeignKeyConstraint(['topic_id'], ['topics.id'], name=op.f('fk_topic_contents_topic_id_topics'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id', name=op.f('pk_topic_contents'))
+    sa.ForeignKeyConstraint(['topic_id'], ['learning_topics.id'], name=op.f('fk_learning_topic_contents_topic_id_learning_topics'), ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id', name=op.f('pk_learning_topic_contents'))
     )
-    op.create_index(op.f('ix_topic_contents_topic_id'), 'topic_contents', ['topic_id'], unique=True)
+    op.create_index(op.f('ix_learning_topic_contents_topic_id'), 'learning_topic_contents', ['topic_id'], unique=True)
     op.create_table('assessment_items',
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('session_id', sa.UUID(), nullable=False),
@@ -281,8 +281,8 @@ def downgrade() -> None:
     op.drop_table('chat_messages')
     op.drop_index(op.f('ix_assessment_items_session_id'), table_name='assessment_items')
     op.drop_table('assessment_items')
-    op.drop_index(op.f('ix_topic_contents_topic_id'), table_name='topic_contents')
-    op.drop_table('topic_contents')
+    op.drop_index(op.f('ix_learning_topic_contents_topic_id'), table_name='learning_topic_contents')
+    op.drop_table('learning_topic_contents')
     op.drop_table('question_topics')
     op.drop_index(op.f('ix_onboarding_survey_options_answer_id'), table_name='onboarding_survey_options')
     op.drop_table('onboarding_survey_options')
@@ -292,8 +292,8 @@ def downgrade() -> None:
     op.drop_table('chat_sessions')
     op.drop_index(op.f('ix_assessment_sessions_user_id'), table_name='assessment_sessions')
     op.drop_table('assessment_sessions')
-    op.drop_index(op.f('ix_topics_module_id'), table_name='topics')
-    op.drop_table('topics')
+    op.drop_index(op.f('ix_learning_topics_module_id'), table_name='learning_topics')
+    op.drop_table('learning_topics')
     op.drop_index(op.f('ix_onboarding_survey_answers_survey_id'), table_name='onboarding_survey_answers')
     op.drop_table('onboarding_survey_answers')
     op.drop_index(op.f('ix_user_sessions_user_id'), table_name='user_sessions')

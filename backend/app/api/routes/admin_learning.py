@@ -19,11 +19,11 @@ from app.models import (
     Board,
     Document,
     DocumentChunk,
+    LearningTopic,
+    LearningTopicContent,
     Module,
     Question,
     QuestionTopic,
-    Topic,
-    TopicContent,
     User,
 )
 from app.schemas.api_response import ok
@@ -158,7 +158,7 @@ async def create_topic(
     module = await session.get(Module, payload.module_id)
     if not module:
         raise BizError(404, BizCode.NOT_FOUND, "module_not_found")
-    topic = Topic(
+    topic = LearningTopic(
         module_id=payload.module_id,
         name=payload.name,
         sort_order=payload.sort_order,
@@ -191,7 +191,7 @@ async def upsert_topic_content(
     user=Depends(get_current_user),
 ):
     _ensure_admin(user)
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -200,7 +200,7 @@ async def upsert_topic_content(
         resources = [item.model_dump() for item in resources]
 
     existing = await session.execute(
-        sa.select(TopicContent).where(TopicContent.topic_id == topic_id)
+        sa.select(LearningTopicContent).where(LearningTopicContent.topic_id == topic_id)
     )
     content = existing.scalar_one_or_none()
 
@@ -210,7 +210,7 @@ async def upsert_topic_content(
         content.summary = payload.summary
         content.resources = resources
     else:
-        content = TopicContent(
+        content = LearningTopicContent(
             topic_id=topic_id,
             body_format=payload.body_format,
             body_markdown=payload.body_markdown,
@@ -240,7 +240,7 @@ async def add_topic_document(
     user=Depends(get_current_user),
 ):
     _ensure_admin(user)
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
     if not payload.chunks:
@@ -287,7 +287,7 @@ async def add_topic_question(
     user=Depends(get_current_user),
 ):
     _ensure_admin(user)
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 

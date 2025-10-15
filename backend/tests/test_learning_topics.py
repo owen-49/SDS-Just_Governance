@@ -26,8 +26,8 @@ from app.models import (  # noqa: E402
     Module,
     Question,
     QuestionTopic,
-    Topic,
-    TopicContent,
+    LearningTopic,
+    LearningTopicContent,
     User,
     UserTopicProgress,
 )
@@ -57,7 +57,7 @@ class LearningTopicFlowTest(unittest.IsolatedAsyncioTestCase):
             )
             board = Board(id=uuid.uuid4(), name="Foundations", sort_order=1)
             module = Module(id=uuid.uuid4(), board_id=board.id, name="Governance 101", sort_order=1)
-            topic = Topic(
+            topic = LearningTopic(
                 id=uuid.uuid4(),
                 module_id=module.id,
                 name="Building Trust",
@@ -65,7 +65,7 @@ class LearningTopicFlowTest(unittest.IsolatedAsyncioTestCase):
                 sort_order=1,
                 is_active=True,
             )
-            topic_extra = Topic(
+            topic_extra = LearningTopic(
                 id=uuid.uuid4(),
                 module_id=module.id,
                 name="Engagement Basics",
@@ -73,7 +73,7 @@ class LearningTopicFlowTest(unittest.IsolatedAsyncioTestCase):
                 sort_order=2,
                 is_active=True,
             )
-            topic_content = TopicContent(
+            topic_content = LearningTopicContent(
                 topic_id=topic.id,
                 body_markdown="# Welcome to the topic",
                 summary="Learn how to build durable trust with stakeholders.",

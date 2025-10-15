@@ -17,9 +17,9 @@ from app.core.exceptions.exceptions import BizError
 from app.deps.auth import get_current_user
 from app.models import (
     Board,
+    LearningTopic,
+    LearningTopicContent,
     Module,
-    Topic,
-    TopicContent,
     UserTopicProgress,
 )
 from app.schemas.api_response import ok
@@ -240,12 +240,15 @@ async def list_topics(
 
     order = _validate_order(order)
     sort_column = _resolve_sort(sort, {
-        "sort_order": Topic.sort_order,
-        "name": Topic.name,
-        "id": Topic.id,
+        "sort_order": LearningTopic.sort_order,
+        "name": LearningTopic.name,
+        "id": LearningTopic.id,
     })
 
-    base_stmt = sa.select(Topic).where(Topic.module_id == module_id, Topic.is_active.is_(True))
+    base_stmt = sa.select(LearningTopic).where(
+        LearningTopic.module_id == module_id,
+        LearningTopic.is_active.is_(True),
+    )
     total_result = await session.execute(
         sa.select(sa.func.count()).select_from(base_stmt.subquery())
     )
@@ -282,7 +285,7 @@ async def get_topic_detail(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -309,9 +312,9 @@ async def get_topic_content(
 ):
     del user
     stmt = (
-        sa.select(TopicContent, Topic)
-        .join(Topic, TopicContent.topic_id == Topic.id)
-        .where(Topic.id == topic_id)
+        sa.select(LearningTopicContent, LearningTopic)
+        .join(LearningTopic, LearningTopicContent.topic_id == LearningTopic.id)
+        .where(LearningTopic.id == topic_id)
     )
     result = await session.execute(stmt)
     row = result.first()
@@ -339,7 +342,7 @@ async def get_topic_progress(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -359,7 +362,7 @@ async def topic_rag_search(
     user=Depends(get_current_user),
 ):
     del user
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -390,7 +393,7 @@ async def start_topic_quiz(
     )
     await session.commit()
 
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     progress = await session.get(UserTopicProgress, (user.id, topic_id))
 
     data = {
@@ -422,7 +425,7 @@ async def submit_topic_quiz(
     await session.commit()
 
     progress = await session.get(UserTopicProgress, (user.id, topic_id))
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
 
     data = summary.as_payload() | {
         "topic_id": str(topic_id),
@@ -440,7 +443,7 @@ async def visit_topic(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -469,7 +472,7 @@ async def complete_topic(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    topic = await session.get(Topic, topic_id)
+    topic = await session.get(LearningTopic, topic_id)
     if not topic or not topic.is_active:
         raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
 
@@ -513,17 +516,17 @@ async def progress_overview(
     boards = boards_result.scalars().unique().all()
 
     totals_result = await session.execute(
-        sa.select(Topic.module_id, sa.func.count())
-        .where(Topic.is_active.is_(True))
-        .group_by(Topic.module_id)
+        sa.select(LearningTopic.module_id, sa.func.count())
+        .where(LearningTopic.is_active.is_(True))
+        .group_by(LearningTopic.module_id)
     )
     totals = {module_id: count for module_id, count in totals_result.all()}
 
     completed_result = await session.execute(
-        sa.select(Topic.module_id, sa.func.count())
-        .join(UserTopicProgress, sa.and_(UserTopicProgress.topic_id == Topic.id, UserTopicProgress.user_id == user.id))
-        .where(Topic.is_active.is_(True), UserTopicProgress.progress_status == "completed")
-        .group_by(Topic.module_id)
+        sa.select(LearningTopic.module_id, sa.func.count())
+        .join(UserTopicProgress, sa.and_(UserTopicProgress.topic_id == LearningTopic.id, UserTopicProgress.user_id == user.id))
+        .where(LearningTopic.is_active.is_(True), UserTopicProgress.progress_status == "completed")
+        .group_by(LearningTopic.module_id)
     )
     completed = {module_id: count for module_id, count in completed_result.all()}
 
