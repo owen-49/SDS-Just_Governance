@@ -24,7 +24,7 @@ class ChatSession(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     scope: Mapped[str] = mapped_column(ChatScope, nullable=False)
-    topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("topics.id"))
+    topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("learning_topics.id"))
     title: Mapped[Optional[str]] = mapped_column(String)
 
     token_count: Mapped[Optional[int]] = mapped_column(Integer)

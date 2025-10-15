@@ -16,9 +16,9 @@ from app.core.exceptions.exceptions import BizError
 from app.models import (
     AssessmentItem,
     AssessmentSession,
+    LearningTopic,
     Question,
     QuestionTopic,
-    Topic,
     User,
     UserTopicProgress,
 )
@@ -68,13 +68,13 @@ class TopicQuizService:
     def __init__(self, minimum_questions: int = 3) -> None:
         self.minimum_questions = minimum_questions
 
-    async def _ensure_topic(self, session: AsyncSession, topic_id: UUID) -> Topic:
-        topic = await session.get(Topic, topic_id)
+    async def _ensure_topic(self, session: AsyncSession, topic_id: UUID) -> LearningTopic:
+        topic = await session.get(LearningTopic, topic_id)
         if not topic or not topic.is_active:
             raise BizError(404, BizCode.NOT_FOUND, "topic_not_found")
         return topic
 
-    async def _ensure_progress(self, session: AsyncSession, user: User, topic: Topic) -> UserTopicProgress:
+    async def _ensure_progress(self, session: AsyncSession, user: User, topic: LearningTopic) -> UserTopicProgress:
         progress = await session.get(UserTopicProgress, (user.id, topic.id))
         if progress:
             return progress
@@ -87,7 +87,7 @@ class TopicQuizService:
         await session.flush()
         return progress
 
-    async def _select_questions(self, session: AsyncSession, topic: Topic, limit: int) -> list[Question]:
+    async def _select_questions(self, session: AsyncSession, topic: LearningTopic, limit: int) -> list[Question]:
         stmt = (
             sa.select(Question)
             .join(QuestionTopic, QuestionTopic.question_id == Question.id)

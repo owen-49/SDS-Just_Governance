@@ -20,7 +20,7 @@ class Document(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=uuid_pk_db())
     title: Mapped[Optional[str]] = mapped_column(String)
     source: Mapped[Optional[str]] = mapped_column(String)
-    topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("topics.id"))
+    topic_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("learning_topics.id"))
     document_metadata: Mapped[Optional[dict]] = mapped_column(JSON_VARIANT)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

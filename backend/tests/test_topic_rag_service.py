@@ -7,7 +7,7 @@ os.environ.setdefault("DATABASE_URL_SYNC", "sqlite:///:memory:")
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
 
-from app.models import Base, Board, Module, Topic, Document, DocumentChunk  # noqa: E402
+from app.models import Base, Board, Module, LearningTopic, Document, DocumentChunk  # noqa: E402
 from app.services.topic_rag import TopicRAGService  # noqa: E402
 
 
@@ -21,7 +21,13 @@ class TopicRagServiceTest(unittest.IsolatedAsyncioTestCase):
         async with self.SessionLocal() as session:
             board = Board(id=uuid.uuid4(), name="Governance", sort_order=1)
             module = Module(id=uuid.uuid4(), board_id=board.id, name="Foundations", sort_order=1)
-            self.topic = Topic(id=uuid.uuid4(), module_id=module.id, name="Transparency", sort_order=1, is_active=True)
+            self.topic = LearningTopic(
+                id=uuid.uuid4(),
+                module_id=module.id,
+                name="Transparency",
+                sort_order=1,
+                is_active=True,
+            )
             document = Document(id=uuid.uuid4(), title="Transparency Playbook", topic_id=self.topic.id)
             chunk_a = DocumentChunk(
                 document_id=document.id,
