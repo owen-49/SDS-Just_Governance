@@ -1,16 +1,18 @@
 # backend/app/schemas/api_response.py
-from typing import Any, Optional
+from typing import Any, Optional, Generic, TypeVar
 from pydantic import BaseModel
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.core.exceptions.codes import BizCode
 
+T = TypeVar('T')
 
-class ApiResponse(BaseModel):
+
+class ApiResponse(BaseModel, Generic[T]):
     code: int = BizCode.OK     # 业务码
     message: str = "ok"     # 信息
-    data: Optional[Any] = None      # 数据
+    data: Optional[T] = None      # 数据
     request_id: Optional[str] = None        # request_id
 
 
