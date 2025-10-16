@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.old_routes.assessment import router as assessment_router
+from app.api.routes.assessment import router as assessment_router
 from app.api.old_routes.chat import router as chat_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.admin_learning import router as admin_learning_router
@@ -55,6 +55,7 @@ app.add_middleware(
 
 setup_exception_handlers(app)
 
+
 @app.get("/")
 def root():
     return {
@@ -65,9 +66,11 @@ def root():
         "healthz": "http://127.0.0.1:8000/healthz",
     }
 
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
 
 # routers
 app.include_router(chat_router, prefix="/ai")
