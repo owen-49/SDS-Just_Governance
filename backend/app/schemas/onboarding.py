@@ -4,7 +4,7 @@ from typing import Annotated
 from pydantic import Field
 
 
-QuestionType = Literal["single_choice", "multi_choice", "text", "rating"]
+QuestionType = Literal["single_choice", "multi_choice", "text"]
 
 class AnswerItem(BaseModel):
     question_number: int
