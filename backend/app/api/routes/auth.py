@@ -29,12 +29,20 @@ REFRESH_COOKIE_NAME = "refresh_token"
 
 # 字典常量，用于统一设置刷新 token Cookie 的属性（安全性配置）
 COOKIE_KW = dict(
-    httponly=True, secure=True, samesite="lax", path="/", max_age=None  # max_age 由 expires 控制
+    httponly=True, secure=True, samesite="lax", path="/"
 )
 
 # 作用：把 refresh token安全地设置到浏览器的 Cookie 中
 def set_refresh_cookie(resp: Response, token_with_jti: str, expires: datetime):
-    resp.set_cookie(REFRESH_COOKIE_NAME, token_with_jti, expires=expires, **COOKIE_KW)
+    resp.set_cookie(
+        REFRESH_COOKIE_NAME, 
+        token_with_jti, 
+        expires=expires, 
+        httponly=True, 
+        secure=True, 
+        samesite="lax", 
+        path="/"
+    )
 
 def clear_refresh_cookie(resp: Response):
     resp.delete_cookie(REFRESH_COOKIE_NAME, path="/")
@@ -84,6 +92,10 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
     if not user or not verify_password(payload.password, user.password_hash or ""):
         # 避免暴露账户存在性
         raise HTTPException(401, "unauthenticated", headers={"WWW-Authenticate": "Bearer"})
+
+    # 检查邮箱是否已验证
+    if user.email_verified_at is None:
+        raise BizError(403, BizCode.EMAIL_NOT_VERIFIED, "email_not_verified")
 
     # 第二步：生成 Token（access + refresh）
     access = create_access_token(str(user.id))
@@ -255,8 +267,8 @@ async def resend_verify_email(
     # 本接口验证 token 的有效性，并将用户标记为“邮箱已验证”。
 @router.get("/verify-email")
 async def verify_email(
+    request: Request,
     token: str = Query(..., description="邮件里的 token"),  # Query用来自动提取查询参数
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
     # 第一步：检查链接中token的合法性
@@ -290,9 +302,13 @@ async def verify_email(
         .values(email_verified_at=datetime.now(timezone.utc))
         .execution_options(synchronize_session=False)
     )
-    # 第四步：把该用户其他未用 token 全撤销
+    
+    # 先提交当前token的使用状态，确保它不会被撤销
+    await db.commit()
+    
+    # 第四步：把该用户其他未用 token 全撤销（当前token已标记为used_at，不会被撤销）
     await revoke_unusued_tokens_of_user(db, row.user_id)
-    # 记得提交
+    # 再次提交撤销操作
     await db.commit()
 
     # 第五步：返回一个“已验证”的响应
