@@ -52,6 +52,7 @@ class BizCode(IntEnum):
     STATE_INVALID = 4004    #
     ALREADY_DONE = 4005
     PRECONDITION_FAILED = 4006  # ETag/If-* 不满足，常配 412
+    EMAIL_NOT_VERIFIED = 4007   # 邮箱未验证 -> 403
 
     # 5xxx 下游/依赖
     UPSTREAM_ERROR = 5001       # 502
@@ -109,6 +110,7 @@ CODE_META: dict[BizCode, CodeMeta] = {
     BizCode.STATE_INVALID: CodeMeta("state_invalid", 409),
     BizCode.ALREADY_DONE: CodeMeta("already_done", 409),
     BizCode.PRECONDITION_FAILED: CodeMeta("precondition_failed", 412),
+    BizCode.EMAIL_NOT_VERIFIED: CodeMeta("email_not_verified", 403),
 
     # 5xxx
     BizCode.UPSTREAM_ERROR: CodeMeta("upstream_error", 502),
