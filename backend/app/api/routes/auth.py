@@ -86,16 +86,15 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
 # 二、登录，成功后返回 access_token并通过 Cookie 设置 refresh_token，并记录登录 session（UserSession）。
 @router.post("/login", response_model=TokenOut)
 async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
-    # 第一步：查询用户并验证密码
+    # 第一步：查询用户
     q = await db.execute(select(User).where(User.email == payload.email))
     user = q.scalar_one_or_none()
-    if not user or not verify_password(payload.password, user.password_hash or ""):
-        # 避免暴露账户存在性
-        raise HTTPException(401, "unauthenticated", headers={"WWW-Authenticate": "Bearer"})
-
-    # 检查邮箱是否已验证
-    if user.email_verified_at is None:
+    # 优先判断邮箱未验证
+    if user and user.email_verified_at is None:
         raise BizError(403, BizCode.EMAIL_NOT_VERIFIED, "email_not_verified")
+    # 账号或密码错误统一提示
+    if not user or not verify_password(payload.password, user.password_hash or ""):
+        raise HTTPException(401, "login_failed", headers={"WWW-Authenticate": "Bearer"})
 
     # 第二步：生成 Token（access + refresh）
     access = create_access_token(str(user.id))
