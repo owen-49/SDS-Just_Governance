@@ -68,18 +68,17 @@ const LoginPage = ({ onLoginSuccess }) => {
         setFieldErrors(extractFieldErrors(err.body));
         setBanner('Validation error. Please check the fields.');
       } else if (err.status === 401) {
-        setBanner('Incorrect password · Forgot Password?');
+        setBanner('Incorrect email or password');
       } else if (err.status === 403 && err.body?.code === 4007) {
-        // 邮箱未验证
-        setBanner('Please verify your email first');
+        // Email not verified
+        setBanner('Please verify your email. A verification email has been sent automatically.');
         setVerify({ email: loginEmail, token: '' });
         setStage('verify');
-        // 自动重新发送验证邮件
+        // Auto resend verification email
         try {
           await onResendVerify();
         } catch (resendErr) {
-          console.error('Failed to resend verification email:', resendErr);
-          setBanner('Please verify your email first. Verification email sent to your inbox.');
+          setBanner('Please verify your email. Verification email resent.');
         }
       } else {
         setBanner('Server error. Please try again.');
@@ -209,14 +208,22 @@ const LoginPage = ({ onLoginSuccess }) => {
     return onRegisterLocal(regEmail, regPassword, regConfirm, regName, regTerms);
   };
 
+  // 倒计时逻辑
+  React.useEffect(() => {
+    if (verify.countdown > 0) {
+      const timer = setTimeout(() => {
+        setVerify(v => ({ ...v, countdown: v.countdown - 1 }));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [verify.countdown]);
+
   const onResendVerify = async () => {
     const email = verify.email || formData.regEmail || formData.loginEmail;
     if (!email) return setBanner('Please enter your email before resending');
     if (USE_AUTH_V1) {
       try {
         const result = await authApi.resendVerify({ email });
-        
-        // 根据API文档处理不同的响应消息
         if (result?.message === 'already_verified') {
           setBanner('Your account is already verified. Please go to login.');
           setActiveTab('login');
@@ -240,7 +247,7 @@ const LoginPage = ({ onLoginSuccess }) => {
     const r = dbApi.createEmailVerificationToken(email);
     if (r.ok) setVerify({ email, token: r.token });
     setBanner('Verification email resent');
-  };
+  }
 
   const onDoVerify = async () => {
     if (USE_AUTH_V1) {
@@ -532,9 +539,11 @@ const LoginPage = ({ onLoginSuccess }) => {
         {stage === 'verify' && (
           <div className="form">
             <div>Verify your email</div>
-            <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>We sent a verification link to {verify.email || formData.regEmail || formData.loginEmail}.</div>
+            <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>A verification link has been sent to {verify.email || formData.regEmail || formData.loginEmail}.</div>
             <div style={{ fontSize: 14, margin: '12px 0', color: '#059669' }}>Please check your email and click the verification link to complete registration.</div>
-            <button onClick={onResendVerify}>Resend verification email</button>
+            <button onClick={onResendVerify} disabled={verify.countdown > 0}>
+              {verify.countdown > 0 ? `Resend verification email (${verify.countdown}s)` : 'Resend verification email'}
+            </button>
             <div className="link">
               <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back</a>
             </div>

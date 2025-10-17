@@ -86,7 +86,7 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
 # 二、登录，成功后返回 access_token并通过 Cookie 设置 refresh_token，并记录登录 session（UserSession）。
 @router.post("/login", response_model=TokenOut)
 async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
-    # 第一步：查询用户并验证密码
+    # 第一步：查询用户
     q = await db.execute(select(User).where(User.email == payload.email))
     user = q.scalar_one_or_none()
 
