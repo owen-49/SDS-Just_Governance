@@ -69,6 +69,18 @@ const LoginPage = ({ onLoginSuccess }) => {
         setBanner('Validation error. Please check the fields.');
       } else if (err.status === 401) {
         setBanner('Incorrect password · Forgot Password?');
+      } else if (err.status === 403 && err.body?.code === 4007) {
+        // 邮箱未验证
+        setBanner('Please verify your email first');
+        setVerify({ email: loginEmail, token: '' });
+        setStage('verify');
+        // 自动重新发送验证邮件
+        try {
+          await onResendVerify();
+        } catch (resendErr) {
+          console.error('Failed to resend verification email:', resendErr);
+          setBanner('Please verify your email first. Verification email sent to your inbox.');
+        }
       } else {
         setBanner('Server error. Please try again.');
       }
@@ -150,6 +162,9 @@ const LoginPage = ({ onLoginSuccess }) => {
       } else {
         setBanner('Please verify your email to complete registration.');
       }
+
+      // 自动发送验证邮件
+      await onResendVerify();
     } catch (err) {
       if (err.status === 422) {
         setFieldErrors(extractFieldErrors(err.body));
@@ -518,7 +533,7 @@ const LoginPage = ({ onLoginSuccess }) => {
           <div className="form">
             <div>Verify your email</div>
             <div style={{ fontSize: 12, color: '#475569', margin: '6px 0' }}>We sent a verification link to {verify.email || formData.regEmail || formData.loginEmail}.</div>
-            <button onClick={onDoVerify}>Click verification link (simulate)</button>
+            <div style={{ fontSize: 14, margin: '12px 0', color: '#059669' }}>Please check your email and click the verification link to complete registration.</div>
             <button onClick={onResendVerify}>Resend verification email</button>
             <div className="link">
               <a href="#back" onClick={(e) => { e.preventDefault(); setStage('auth'); }}>Back</a>
