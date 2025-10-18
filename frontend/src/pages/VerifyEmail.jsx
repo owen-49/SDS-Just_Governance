@@ -31,7 +31,13 @@ export default function VerifyEmail() {
         const code = e?.body?.code;
         if (code === 1003) setBanner('Verification link has expired. Please request a new verification email.');
         else if (code === 1004) setBanner('Invalid verification link. Please request a new verification email.');
-        else if (code === 1005) setBanner('This verification link has been revoked. Please use the latest verification email.');
+        else if (code === 1005) {
+          setBanner('This verification link has been revoked. This may happen if you have already verified your email or requested a new verification email. Please try logging in or request a new verification email.');
+          // 如果token被撤销，可能是因为已验证，跳转到登录
+          setTimeout(() => {
+            navigate('/auth?tab=login');
+          }, 5000); // 给用户更多时间阅读消息
+        }
         else setBanner('Verification failed. Please try again or request a new verification email.');
       }
     })();

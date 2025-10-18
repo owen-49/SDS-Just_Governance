@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.exc import IntegrityError
+from app.core.config.config import ENV
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db.db import get_db
@@ -186,9 +188,9 @@ async def get_survey(request:Request):
 
 @router.post("/survey/submit")
 async def submit_survey(payload: SubmitPayload,
+                        request: Request,
                         session: AsyncSession = Depends(get_db),
-                        user=Depends(get_current_user),
-                        request:Request=None):
+                        user=Depends(get_current_user)):
     existed = await get_user_survey(session, user.id)
     if existed:
         return fail(http_status=status.HTTP_409_CONFLICT,
@@ -196,15 +198,58 @@ async def submit_survey(payload: SubmitPayload,
                     request=request)
 
     total, level = calculate_score(payload.answers)
-    await create_full_survey(session, user.id, payload.answers, total, level)
-    await session.commit()
+
+    try:
+        await create_full_survey(session, user.id, payload.answers, total, level)
+        await session.commit()
+    except IntegrityError as e:
+        await session.rollback()
+        orig = getattr(e, "orig", e)
+        msg = str(orig).lower()
+        constraint = getattr(orig, "constraint_name", None)
+        # Map common constraint errors to clearer business messages
+        if (
+            "fk_onboarding_surveys_user_id_users" in msg
+            or ("foreign key" in msg and "onboarding_surveys" in msg and "user_id" in msg)
+            or (constraint and constraint.startswith("fk_onboarding_surveys_user_id_"))
+        ):
+            return fail(http_status=status.HTTP_409_CONFLICT,
+                        code=4001, message="user_not_found_or_inactive",
+                        data={"constraint": constraint} if ENV == "dev" else None,
+                        request=request)
+        if (
+            "uq_onboarding_survey_user" in msg
+            or ("unique" in msg and "onboarding_surveys" in msg and "user_id" in msg)
+            or (constraint and constraint.startswith("uq_onboarding_survey_user"))
+        ):
+            return fail(http_status=status.HTTP_409_CONFLICT,
+                        code=4001, message="already_submitted",
+                        data={"constraint": constraint} if ENV == "dev" else None,
+                        request=request)
+        if (
+            "uq_survey_question_key" in msg
+            or ("unique" in msg and "onboarding_survey_answers" in msg and "question_key" in msg)
+            or (constraint and constraint.startswith("uq_survey_question_key"))
+        ):
+            return fail(http_status=status.HTTP_409_CONFLICT,
+                        code=4001, message="duplicate_question_key",
+                        data={"constraint": constraint} if ENV == "dev" else None,
+                        request=request)
+        # Fallback: expose a safe label
+        return fail(http_status=status.HTTP_400_BAD_REQUEST,
+                    code=4001, message="integrity_error",
+                    data={
+                        "detail": "constraint_violation",
+                        **({"constraint": constraint, "orig": str(orig)} if ENV == "dev" else {}),
+                    },
+                    request=request)
 
     return ok(data=SubmitResult(score=total, level=level).model_dump(), request=request)
 
 @router.get("/survey/result")
-async def get_my_result(session: AsyncSession = Depends(get_db),
-                        user=Depends(get_current_user),
-                        request=None):
+async def get_my_result(request: Request,
+                        session: AsyncSession = Depends(get_db),
+                        user=Depends(get_current_user)):
     rec = await get_user_survey(session, user.id)
     if not rec:
         return fail(http_status=status.HTTP_404_NOT_FOUND,
