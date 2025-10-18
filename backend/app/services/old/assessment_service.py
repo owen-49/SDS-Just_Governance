@@ -9,7 +9,9 @@
 5. 查看评测详情（逐题回放）
 """
 from __future__ import annotations
-from typing import Optional, List
+import asyncio
+import logging
+from typing import Optional, List, Dict
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -33,8 +35,14 @@ from app.schemas.assessment import (
     QuestionSnapshot,
     TopicBreakdown,
     AIRecommendation,
+    format_answer_for_storage,
+    normalize_single_choice_answer,
+    normalize_multi_choice_answer,
     build_pagination_meta,
 )
+from app.services.old.gpt_call import generate_assessment_feedback
+
+logger = logging.getLogger(__name__)
 
 # Repositories
 from app.repositories import questions as questions_repo
@@ -255,11 +263,19 @@ class AssessmentService:
 
         # 4. Upsert 答题记录（创建或更新）
         # TODO: 可选实时判分（需要查询 question 的 answer_key）
+        snapshot = item.question_snapshot or {}
+        qtype = snapshot.get("qtype")
+        stored_answer = (
+            format_answer_for_storage(payload.answer, qtype)
+            if qtype
+            else payload.answer
+        )
+
         await responses_repo.upsert_response(
             self.db,
             session_id=session_id,
             item_id=payload.item_id,
-            answer=payload.answer,
+            answer=stored_answer,
         )
 
         # 5. 更新 last_question_index（可选）
@@ -432,6 +448,26 @@ class AssessmentService:
         """
         results = []
 
+        item_question_map: Dict[UUID, UUID] = {}
+        question_ids: List[UUID] = []
+
+        for item in items:
+            snapshot = item.question_snapshot or {}
+            raw_qid = snapshot.get("question_id")
+            if not raw_qid:
+                continue
+            try:
+                qid = UUID(str(raw_qid))
+            except ValueError:
+                continue
+            item_question_map[item.id] = qid
+            question_ids.append(qid)
+
+        question_map = {}
+        if question_ids:
+            unique_ids = list(dict.fromkeys(question_ids))
+            question_map = await questions_repo.get_questions_by_ids(self.db, unique_ids)
+
         for item in items:
             response = responses_map.get(item.id)
 
@@ -459,25 +495,38 @@ class AssessmentService:
                 )
                 continue
 
-            # 判分逻辑（复用 quiz_service 的逻辑）
-            snapshot = item.question_snapshot
-            qtype = snapshot.get("qtype")
-
-            # TODO: 需要从 questions 表获取 answer_key
-            # 暂时简化：假设已有 answer_key 在 snapshot 中
-            # 实际应该：从 question_id 查询完整题目
-
-            is_correct = False
+            question = question_map.get(item_question_map.get(item.id))
+            is_correct = None
             score = 0.0
 
-            if qtype == "single":
-                # 单选题判分
-                is_correct = True  # TODO: 实现判分逻辑
-                score = 1.0 if is_correct else 0.0
+            if question:
+                user_answer = (response.answer or "").strip()
+                correct_answer = questions_repo.extract_correct_answer(question)
 
-            elif qtype == "multi":
-                # 多选题判分
-                score = 0.5  # TODO: 实现部分对逻辑
+                if question.qtype == "single":
+                    if correct_answer:
+                        correct = normalize_single_choice_answer(correct_answer)
+                        user = normalize_single_choice_answer(user_answer) if user_answer else ""
+                        if user:
+                            is_correct = user == correct
+                            score = 1.0 if is_correct else 0.0
+
+                elif question.qtype == "multi":
+                    if correct_answer:
+                        correct = normalize_multi_choice_answer(correct_answer)
+                        user = (
+                            normalize_multi_choice_answer(user_answer)
+                            if user_answer
+                            else ""
+                        )
+                        if user:
+                            is_correct = user == correct
+                            score = 1.0 if is_correct else 0.0
+
+                else:
+                    # 主观题暂不自动判分，沿用已有成绩（若有）
+                    is_correct = response.is_correct
+                    score = float(response.score or 0.0)
 
             results.append(
                 {
@@ -531,10 +580,30 @@ class AssessmentService:
         Note:
             可以异步生成，先返回基础结果，后台更新
         """
-        # TODO: 调用 OpenAI API 生成总结和建议
-        # 暂时返回模拟数据
+        loop = asyncio.get_running_loop()
+        breakdown_payload = [item.model_dump() for item in breakdown]
 
-        ai_summary = f"您的总分为 {total_score:.1f}分，表现良好。"
+        fallback_summary = f"Your overall score is {total_score:.1f}. Keep refining weaker areas."
+        fallback_actions = [
+            "Review topics with lower scores.",
+            "Schedule additional practice sessions.",
+        ]
+
+        try:
+            summary, actions = await loop.run_in_executor(
+                None,
+                generate_assessment_feedback,
+                float(total_score),
+                breakdown_payload,
+            )
+        except Exception as exc:
+            logger.warning("Failed to generate AI feedback: %s", exc)
+            summary, actions = fallback_summary, fallback_actions
+
+        if not summary:
+            summary = fallback_summary
+        if not actions:
+            actions = fallback_actions
 
         level = (
             "beginner"
@@ -542,16 +611,17 @@ class AssessmentService:
             else "intermediate" if total_score < 80 else "advanced"
         )
 
+        focus_topics = [
+            item.topic_name for item in breakdown if item.score < 80
+        ]
+
         ai_recommendation = AIRecommendation(
             level=level,
-            focus_topics=[],
-            suggested_actions=[
-                "复习薄弱环节",
-                "多做练习题",
-            ],
+            focus_topics=focus_topics,
+            suggested_actions=actions,
         )
 
-        return ai_summary, ai_recommendation.model_dump()
+        return summary, ai_recommendation.model_dump()
 
     # ========================================
     # 四、查看历史记录（个人中心）
@@ -643,12 +713,41 @@ class AssessmentService:
         # 3. 查询题目和答题记录（JOIN）
         results = await responses_repo.get_responses_with_items(self.db, session_id)
 
+        # 3. 准备题目映射，补全正确答案与解析
+        question_ids: List[UUID] = []
+        for _, snapshot in results:
+            raw_qid = snapshot.get("question_id") if isinstance(snapshot, dict) else None
+            if raw_qid:
+                try:
+                    question_ids.append(UUID(str(raw_qid)))
+                except ValueError:
+                    continue
+
+        question_map = {}
+        if question_ids:
+            unique_ids = list(dict.fromkeys(question_ids))
+            question_map = await questions_repo.get_questions_by_ids(self.db, unique_ids)
+
         # 4. 构建 items 列表
         items_with_responses = []
         for response, snapshot in results:
             # 从 questions 表查询完整题目（获取 answer_key 和 explanation）
             # TODO: 优化为批量查询
             # question = await questions_repo.get_question_by_id(...)
+
+            question = None
+            raw_qid = snapshot.get("question_id") if isinstance(snapshot, dict) else None
+            if raw_qid:
+                try:
+                    question = question_map.get(UUID(str(raw_qid)))
+                except ValueError:
+                    question = None
+
+            correct_answer = (
+                questions_repo.extract_correct_answer(question) if question else None
+            )
+            explanation = question.explanation if question and question.explanation else None
+            score_value = float(response.score) if response.score is not None else None
 
             items_with_responses.append(
                 ItemWithResponse(
@@ -664,15 +763,15 @@ class AssessmentService:
                         snapshot=QuestionSnapshot(
                             qtype=snapshot["qtype"],
                             stem=snapshot["stem"],
-                            choices=snapshot.get("choices"),
-                        ),
-                        your_answer=response.answer,
-                        is_correct=response.is_correct,
-                        correct_answer=None,  # TODO: 从 question 获取
-                        explanation=None,  # TODO: 从 question 获取
-                        score=float(response.score) if response.score else None,
+                        choices=snapshot.get("choices"),
                     ),
-                )
+                    your_answer=response.answer,
+                    is_correct=response.is_correct,
+                    correct_answer=correct_answer,
+                    explanation=explanation,
+                    score=score_value,
+                ),
+            )
             )
 
         # 5. 构建会话详情

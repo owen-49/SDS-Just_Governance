@@ -557,15 +557,47 @@ def extract_correct_answer(question: QuestionDTO) -> Optional[str]:
 
     answer_key = question.answer_key
 
+    def _pull_value(*keys):
+        for key in keys:
+            if isinstance(answer_key, dict) and key in answer_key:
+                return answer_key[key]
+        return None
+
     if question.qtype == "single":
-        # 假设 answer_key 格式: {"correct": "B"}
-        return answer_key.get("correct", "").strip().upper()
+        # 常见格式: {"correct": "B"} 或 {"correct_options": ["B"]} 等
+        value = _pull_value(
+            "correct",
+            "correct_option",
+            "correctOption",
+            "correct_options",
+            "correctOptions",
+        )
+        if isinstance(value, list):
+            for candidate in value:
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip().upper()
+            return None
+        if isinstance(value, str):
+            return value.strip().upper()
+        return None
 
     elif question.qtype == "multi":
-        # 假设 answer_key 格式: {"correct": ["A", "C", "D"]}
-        correct_list = answer_key.get("correct", [])
-        if isinstance(correct_list, list):
-            sorted_answers = sorted([c.strip().upper() for c in correct_list])
+        # 常见格式: {"correct": ["A", "C"]} 或 {"correct_options": ["A","C"]}
+        value = _pull_value(
+            "correct",
+            "correct_options",
+            "correctOptions",
+        )
+        if isinstance(value, str):
+            # 允许以逗号分隔的字符串
+            items = [part.strip().upper() for part in value.split(",") if part.strip()]
+        elif isinstance(value, list):
+            items = [str(part).strip().upper() for part in value if str(part).strip()]
+        else:
+            items = []
+
+        if items:
+            sorted_answers = sorted(set(items))
             return ",".join(sorted_answers)
         return None
 
