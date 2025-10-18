@@ -4,10 +4,16 @@
 包含主题小测和整体评测的所有请求/响应模型
 """
 from datetime import datetime
-from typing import Optional, List, Literal, Any
+from typing import Optional, List, Literal, Any, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+
+ChoicePayload = Union[
+    List[str],
+    List[dict[str, Any]],
+    dict[str, Any],
+]
 
 
 # ========================================
@@ -22,7 +28,9 @@ class QuestionSnapshot(BaseModel):
 
     qtype: Literal["single", "multi", "short"]
     stem: str = Field(..., description="题干")
-    choices: Optional[List[str]] = Field(None, description="选项列表（客观题）")
+    choices: Optional[ChoicePayload] = Field(
+        None, description="选项列表（客观题，支持字符串或对象形式）"
+    )
     # 注意：不包含 answer_key，防止泄露答案
 
     model_config = ConfigDict(from_attributes=True)
@@ -67,19 +75,34 @@ class QuizPendingOut(BaseModel):
 
 class AnswerItem(BaseModel):
     """
-    单题答案提交
+    Payload for a single quiz item answer.
     """
 
-    order_no: int = Field(..., ge=1, description="题号（从1开始）")
+    order_no: Optional[int] = Field(
+        None, ge=1, description="Question order number (1-based)"
+    )
+    item_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "Optional question identifier (same as `question_id` in the pending quiz "
+            "snapshot). Used when order is not supplied."
+        ),
+    )
     answer: str = Field(
-        ..., min_length=1, description="答案（单选: 'A', 多选: 'A,C', 简答: 文本）"
+        ..., min_length=1, description="Answer value (single: 'A', multi: 'A,C', text)"
     )
 
     @field_validator("answer")
     @classmethod
     def validate_answer_format(cls, v: str) -> str:
-        """答案去除首尾空白"""
+        """Trim whitespace from the answer payload."""
         return v.strip()
+
+    @model_validator(mode="after")
+    def ensure_identifier(cls, values: "AnswerItem") -> "AnswerItem":
+        if values.order_no is None and values.item_id is None:
+            raise ValueError("Either order_no or item_id must be provided.")
+        return values
 
 
 class QuizSubmitIn(BaseModel):
@@ -314,7 +337,7 @@ class QuestionDTO(BaseModel):
     id: UUID
     qtype: Literal["single", "multi", "short"]
     stem: str
-    choices: Optional[dict] = None  # JSONB 格式
+    choices: Optional[ChoicePayload] = None  # JSONB 格式
     answer_key: Optional[dict] = None  # 正确答案
     explanation: Optional[str] = None
     is_active: bool = True
@@ -429,8 +452,41 @@ def format_answer_for_storage(answer: str, qtype: str) -> str:
 # ========================================
 
 
+def _extract_option_codes(choices: Optional[ChoicePayload]) -> List[str]:
+    """
+    将不同结构的选项统一提取为大写选项编码（如 A、B、C）
+    """
+    if not choices:
+        return []
+
+    codes: List[str] = []
+
+    if isinstance(choices, dict):
+        for key in choices.keys():
+            key_str = str(key).strip().upper()
+            if key_str:
+                codes.append(key_str)
+        return codes
+
+    for item in choices:
+        if isinstance(item, str):
+            candidate = item.strip()
+            if candidate:
+                codes.append(candidate[0].upper())
+        elif isinstance(item, dict):
+            if item.get("id"):
+                codes.append(str(item["id"]).strip().upper())
+            elif item.get("value"):
+                codes.append(str(item["value"]).strip().upper())
+            elif item.get("label"):
+                label = str(item["label"]).strip()
+                if label:
+                    codes.append(label[0].upper())
+    return codes
+
+
 def validate_answer_format(
-    answer: str, qtype: str, choices: Optional[List[str]] = None
+    answer: str, qtype: str, choices: Optional[ChoicePayload] = None
 ) -> bool:
     """
     验证答案格式是否合法
@@ -454,19 +510,20 @@ def validate_answer_format(
     if not answer or not answer.strip():
         return False
 
+    option_codes = _extract_option_codes(choices)
+
     if qtype == "single":
-        if not choices:
+        if not option_codes:
             return False
         normalized = normalize_single_choice_answer(answer)
-        # 假设 choices 格式为 ["A. ...", "B. ...", "C. ...", "D. ..."]
-        valid_options = {c[0].upper() for c in choices if c}
+        valid_options = set(option_codes)
         return normalized in valid_options
 
     elif qtype == "multi":
-        if not choices:
+        if not option_codes:
             return False
         normalized = normalize_multi_choice_answer(answer)
-        valid_options = {c[0].upper() for c in choices if c}
+        valid_options = set(option_codes)
         selected = set(normalized.split(","))
         return selected.issubset(valid_options) and len(selected) > 0
 

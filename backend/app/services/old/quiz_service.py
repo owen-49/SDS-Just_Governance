@@ -6,7 +6,7 @@
 2. 提交并判分（建会话、落库、更新进度）
 """
 from __future__ import annotations
-from typing import Optional, List
+from typing import Optional, List, Dict
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -20,6 +20,10 @@ from app.schemas.assessment import (
     QuestionBase,
     QuestionWithAnswer,
     AnswerItem,
+    QuestionSnapshot,
+    format_answer_for_storage,
+    normalize_single_choice_answer,
+    normalize_multi_choice_answer,
 )
 
 # Repositories
@@ -27,6 +31,7 @@ from app.repositories import questions as questions_repo
 from app.repositories import assessment_sessions as sessions_repo
 from app.repositories import assessment_items as items_repo
 from app.repositories import assessment_responses as responses_repo
+from app.repositories import user_topic_progress as progress_repo
 
 
 class QuizService:
@@ -69,18 +74,15 @@ class QuizService:
             ...     user_id=user_id, topic_id=topic_id
             ... )
         """
-        # TODO: 这里需要实现 user_progress_repo（暂时用伪代码占位）
-        # from app.repositories import user_progress as progress_repo
-        # progress = await progress_repo.get_or_create_progress(
-        #     self.db, user_id=user_id, topic_id=topic_id
-        # )
+        progress = await progress_repo.get_or_create_progress(
+            self.db, user_id=user_id, topic_id=topic_id
+        )
 
-        # 暂时模拟：假设没有 pending_quiz，需要生成
-        # if progress.pending_quiz and progress.quiz_state == "pending":
-        #     # 已有待做题单，直接返回
-        #     return self._build_pending_out(progress.pending_quiz, topic_id)
+        if progress.pending_quiz and progress.quiz_state == "pending":
+            return self._build_pending_out(
+                progress.pending_quiz, topic_id, quiz_state=progress.quiz_state
+            )
 
-        # 1. 检查主题是否存在（通过查询题目数量来验证）
         is_enough, actual_count = await questions_repo.check_topic_has_enough_questions(
             self.db, topic_id=topic_id, required_count=question_count
         )
@@ -97,29 +99,26 @@ class QuizService:
                 },
             )
 
-        # 2. 随机抽题
         questions = await questions_repo.get_random_questions_by_topic(
             self.db, topic_id=topic_id, count=question_count
         )
 
-        # 3. 构建题单快照（不含答案）
         pending_quiz = []
         for idx, question in enumerate(questions, start=1):
             snapshot = {
-                "order_no": idx,
                 "question_id": str(question.id),
                 "qtype": question.qtype,
                 "stem": question.stem,
-                "choices": question.choices,  # JSONB 格式
+                "choices": question.choices,
             }
-            pending_quiz.append(snapshot)
+            pending_quiz.append({"order_no": idx, "snapshot": snapshot})
 
-        # 4. 存入 user_topic_progress.pending_quiz
-        # await progress_repo.save_pending_quiz(
-        #     self.db, user_id=user_id, topic_id=topic_id, pending_quiz=pending_quiz
-        # )
+        await progress_repo.set_pending_quiz(
+            self.db, progress=progress, pending_quiz=pending_quiz
+        )
+        await self.db.commit()
 
-        # 5. 返回题单
+
         return self._build_pending_out(pending_quiz, topic_id, quiz_state="pending")
 
     def _build_pending_out(
@@ -138,15 +137,30 @@ class QuizService:
         """
         questions = []
         for item in pending_quiz:
+            snapshot_data = item.get("snapshot") if isinstance(item, dict) else None
+            if snapshot_data is None:
+                snapshot_data = item
+
+            question_id_str = snapshot_data.get("question_id")
+            try:
+                question_uuid = UUID(str(question_id_str)) if question_id_str else None
+            except ValueError:
+                question_uuid = None
+
+            if question_uuid is None:
+                raise BizError(
+                    500, BizCode.INTERNAL_ERROR, "quiz_snapshot_invalid_question_id"
+                )
+
             questions.append(
                 QuestionBase(
-                    item_id=UUID(item["question_id"]),  # 临时用 question_id
-                    order_no=item["order_no"],
-                    snapshot={
-                        "qtype": item["qtype"],
-                        "stem": item["stem"],
-                        "choices": item.get("choices"),
-                    },
+                    item_id=question_uuid,
+                    order_no=item.get("order_no"),
+                    snapshot=QuestionSnapshot(
+                        qtype=snapshot_data.get("qtype"),
+                        stem=snapshot_data.get("stem"),
+                        choices=snapshot_data.get("choices"),
+                    ),
                 )
             )
 
@@ -161,262 +175,266 @@ class QuizService:
     async def submit_and_grade(
         self, *, user_id: UUID, topic_id: UUID, answers: List[AnswerItem]
     ) -> QuizSubmitOut:
-        """
-        提交主题小测并判分
-
-        业务逻辑：
-        1. 从 pending_quiz 取题单（若不存在 → 409）
-        2. **此时才创建** assessment_sessions(kind='topic_quiz', topic_id=...)
-        3. 为每题写入 assessment_items（question_snapshot）
-        4. 写入 assessment_responses，判分客观题
-        5. 计算 total_score，更新 user_topic_progress:
-           - last_score, attempt_count, best_score
-           - last_quiz_session_id
-           - quiz_state='completed', 清空 pending_quiz
-
-        Args:
-            user_id: 用户ID
-            topic_id: 主题ID
-            answers: 答案列表
-
-        Returns:
-            QuizSubmitOut 对象
-
-        Raises:
-            BizError(409): pending_quiz不存在或已完成
-            BizError(422): 答案格式错误
-
-        Example:
-            >>> result = await quiz_service.submit_and_grade(
-            ...     user_id=user_id,
-            ...     topic_id=topic_id,
-            ...     answers=[
-            ...         AnswerItem(order_no=1, answer="B"),
-            ...         AnswerItem(order_no=2, answer="A,C"),
-            ...     ]
-            ... )
-        """
-        # TODO: 需要 user_progress_repo
-        # from app.repositories import user_progress as progress_repo
-        # progress = await progress_repo.get_progress(
-        #     self.db, user_id=user_id, topic_id=topic_id
-        # )
-
-        # 暂时模拟：假设从 pending_quiz 取题
-        # if not progress or not progress.pending_quiz:
-        #     raise BizError(409, BizCode.CONFLICT, "no_pending_quiz")
-        #
-        # if progress.quiz_state == "completed":
-        #     raise BizError(409, BizCode.ALREADY_DONE, "quiz_already_completed")
-        #
-        # pending_quiz = progress.pending_quiz
-
-        # 1. 模拟：直接从 question_topics 抽题（实际应从 pending_quiz 读）
-        questions = await questions_repo.get_random_questions_by_topic(
-            self.db, topic_id=topic_id, count=len(answers)
+        """Submit a topic quiz and return grading outcome."""
+        progress = await progress_repo.get_progress(
+            self.db, user_id=user_id, topic_id=topic_id
         )
 
-        # 构建 pending_quiz（模拟）
-        pending_quiz = []
-        for idx, question in enumerate(questions, start=1):
-            pending_quiz.append(
-                {
-                    "order_no": idx,
-                    "question_id": str(question.id),
-                    "qtype": question.qtype,
-                    "stem": question.stem,
-                    "choices": question.choices,
+        if not progress or not progress.pending_quiz:
+            raise BizError(409, BizCode.CONFLICT, "no_pending_quiz")
+
+        pending_quiz_raw = progress.pending_quiz
+        if not isinstance(pending_quiz_raw, list):
+            raise BizError(500, BizCode.INTERNAL_ERROR, "pending_quiz_invalid")
+
+        snapshot_map: Dict[int, dict] = {}
+        question_ids: List[UUID] = []
+        question_order_map: Dict[UUID, int] = {}
+
+        for entry in pending_quiz_raw:
+            if not isinstance(entry, dict):
+                continue
+
+            order_no = entry.get("order_no")
+            if order_no is None:
+                continue
+
+            snapshot = entry.get("snapshot")
+            if not isinstance(snapshot, dict):
+                snapshot = {
+                    "question_id": entry.get("question_id"),
+                    "qtype": entry.get("qtype"),
+                    "stem": entry.get("stem"),
+                    "choices": entry.get("choices"),
                 }
+
+            snapshot_map[int(order_no)] = snapshot
+
+            question_id = snapshot.get("question_id")
+            if question_id:
+                try:
+                    question_uuid = UUID(str(question_id))
+                except ValueError:
+                    raise BizError(
+                        500, BizCode.INTERNAL_ERROR, "quiz_snapshot_invalid_question_id"
+                    )
+                question_order_map[question_uuid] = int(order_no)
+                question_ids.append(question_uuid)
+
+        if not snapshot_map:
+            raise BizError(409, BizCode.CONFLICT, "no_pending_quiz")
+
+        expected_orders = set(snapshot_map.keys())
+        resolved_order_sequence: List[int] = []
+        resolved_answer_map: Dict[int, AnswerItem] = {}
+        invalid_refs: List[str] = []
+        duplicate_orders: List[int] = []
+
+        for item in answers:
+            resolved_order: Optional[int] = None
+
+            if item.order_no is not None:
+                resolved_order = item.order_no
+            elif item.item_id is not None:
+                resolved_order = question_order_map.get(item.item_id)
+                if resolved_order is None:
+                    invalid_refs.append(str(item.item_id))
+                    continue
+            else:
+                invalid_refs.append("missing_identifier")
+                continue
+
+            if resolved_order not in snapshot_map:
+                invalid_refs.append(str(resolved_order))
+                continue
+
+            if resolved_order in resolved_answer_map:
+                duplicate_orders.append(resolved_order)
+                continue
+
+            resolved_order_sequence.append(resolved_order)
+            resolved_answer_map[resolved_order] = item
+
+        if invalid_refs:
+            raise BizError(
+                422,
+                BizCode.VALIDATION_ERROR,
+                "invalid_answer_reference",
+                data={"references": invalid_refs},
             )
 
-        # 2. 创建评测会话（此时才建会话）
+        if duplicate_orders:
+            raise BizError(
+                422,
+                BizCode.VALIDATION_ERROR,
+                "duplicate_answers",
+                data={"orders": sorted(set(duplicate_orders))},
+            )
+
+        provided_orders = set(resolved_answer_map.keys())
+        missing_orders = expected_orders - provided_orders
+
+        if missing_orders:
+            raise BizError(
+                422,
+                BizCode.VALIDATION_ERROR,
+                "missing_answers",
+                data={"missing_orders": sorted(missing_orders)},
+            )
+
+        questions_map: Dict[UUID, object] = {}
+        if question_ids:
+            unique_ids = list(dict.fromkeys(question_ids))
+            questions_map = await questions_repo.get_questions_by_ids(
+                self.db, unique_ids
+            )
+            missing_questions = [
+                str(qid) for qid in unique_ids if qid not in questions_map
+            ]
+            if missing_questions:
+                raise BizError(
+                    500,
+                    BizCode.INTERNAL_ERROR,
+                    "questions_missing",
+                    data={"question_ids": missing_questions},
+                )
+
         session = await sessions_repo.create_session(
             self.db, user_id=user_id, kind="topic_quiz", topic_id=topic_id
         )
 
-        # 3. 写入 assessment_items（题目快照）
         items = await items_repo.create_items_from_snapshots(
-            self.db, session_id=session.id, snapshots=pending_quiz
+            self.db, session_id=session.id, snapshots=pending_quiz_raw
         )
 
-        # 4. 判分并写入 assessment_responses
+        prepared_answers = [
+            AnswerItem(order_no=order, answer=resolved_answer_map[order].answer)
+            for order in resolved_order_sequence
+        ]
+
         grading_results = await self._grade_answers(
-            items=items, answers=answers, questions=questions
+            items=items,
+            answers=prepared_answers,
+            snapshot_map=snapshot_map,
+            questions_map=questions_map,
         )
 
-        # 5. 批量创建答题记录
-        responses_data = []
-        for result in grading_results:
-            responses_data.append(
-                {
-                    "item_id": result["item_id"],
-                    "answer": result["answer"],
-                    "is_correct": result["is_correct"],
-                    "score": result["score"],
-                }
-            )
+        responses_data = [
+            {
+                "item_id": result["item_id"],
+                "answer": result["answer"],
+                "is_correct": result["is_correct"],
+                "score": result["score"],
+            }
+            for result in grading_results
+        ]
 
         await responses_repo.create_responses_batch(
             self.db, session_id=session.id, responses_data=responses_data
         )
 
-        # 6. 计算总分
         total_score = sum(r["score"] for r in grading_results)
         total_score_percent = (
-            (total_score / len(grading_results)) * 100 if grading_results else 0
+            (total_score / len(grading_results)) * 100 if grading_results else 0.0
         )
 
-        # 7. 更新 assessment_sessions.total_score
         await sessions_repo.mark_as_submitted(
             self.db, session_id=session.id, total_score=total_score_percent
         )
 
-        # 8. 更新 user_topic_progress
-        # await progress_repo.update_quiz_scores(
-        #     self.db,
-        #     user_id=user_id,
-        #     topic_id=topic_id,
-        #     last_score=total_score_percent,
-        #     best_score=max(progress.best_score or 0, total_score_percent),
-        #     attempt_count=(progress.attempt_count or 0) + 1,
-        #     last_quiz_session_id=session.id,
-        #     quiz_state="completed",
-        # )
+        await progress_repo.update_after_quiz(
+            self.db,
+            progress=progress,
+            total_score=total_score_percent,
+            session_id=session.id,
+            threshold=80.0,
+        )
 
         await self.db.commit()
 
-        # 9. 构建响应
         return self._build_submit_out(
             session_id=session.id,
             grading_results=grading_results,
             total_score=total_score_percent,
-            threshold=80.0,  # TODO: 从 topics.pass_threshold 读取
+            threshold=80.0,
         )
 
     async def _grade_answers(
-        self, *, items: List, answers: List[AnswerItem], questions: List
+        self,
+        *,
+        items: List,
+        answers: List[AnswerItem],
+        snapshot_map: Dict[int, dict],
+        questions_map: Dict[UUID, object],
     ) -> List[dict]:
-        """
-        判分核心逻辑
-
-        Args:
-            items: 题目实例列表
-            answers: 用户答案列表
-            questions: 完整题目列表（含答案）
-
-        Returns:
-            判分结果列表
-            [
-                {
-                    "item_id": UUID,
-                    "order_no": int,
-                    "answer": str,
-                    "is_correct": bool,
-                    "correct_answer": str,
-                    "explanation": str,
-                    "score": float
-                },
-                ...
-            ]
-        """
-        # 构建索引：order_no -> item
-        items_map = {item.order_no: item for item in items}
-
-        # 构建索引：question_id -> question
-        questions_map = {q.id: q for q in questions}
-
-        # 构建索引：order_no -> answer
-        answers_map = {ans.order_no: ans.answer for ans in answers}
-
+        """判分核心逻辑。"""
+        answers_map = {ans.order_no: ans.answer.strip() for ans in answers}
         results = []
 
         for item in items:
             order_no = item.order_no
-            user_answer = answers_map.get(order_no, "").strip()
+            snapshot = snapshot_map.get(order_no) or {}
 
-            # 从 snapshot 获取 question_id
-            snapshot = item.question_snapshot
-            question_id_str = snapshot.get("question_id")
+            question = None
+            question_id = snapshot.get("question_id")
+            if question_id:
+                try:
+                    question = questions_map.get(UUID(str(question_id)))
+                except ValueError:
+                    question = None
 
-            # 暂时简化：直接用 order_no 对应 questions 列表
-            question = questions[order_no - 1] if order_no <= len(questions) else None
+            user_answer_raw = answers_map.get(order_no, "")
+            qtype = snapshot.get("qtype") or (question.qtype if question else None)
+            stored_answer = (
+                format_answer_for_storage(user_answer_raw, qtype)
+                if qtype and user_answer_raw
+                else user_answer_raw.strip()
+            )
 
-            if not question:
-                # 题目不存在，跳过
-                results.append(
-                    {
-                        "item_id": item.id,
-                        "order_no": order_no,
-                        "answer": user_answer,
-                        "is_correct": False,
-                        "correct_answer": None,
-                        "explanation": None,
-                        "score": 0.0,
-                    }
-                )
-                continue
+            correct_answer_raw = (
+                questions_repo.extract_correct_answer(question) if question else None
+            )
 
-            # 提取正确答案
-            correct_answer = questions_repo.extract_correct_answer(question)
-            explanation = questions_repo.get_explanation(question)
+            normalized_correct = None
+            if correct_answer_raw:
+                if qtype == "single":
+                    normalized_correct = normalize_single_choice_answer(correct_answer_raw)
+                elif qtype == "multi":
+                    normalized_correct = normalize_multi_choice_answer(correct_answer_raw)
+                else:
+                    normalized_correct = correct_answer_raw
 
-            # 判分逻辑
-            is_correct = False
+            is_correct = None
             score = 0.0
 
-            if question.qtype == "single":
-                # 单选题：完全匹配
-                normalized_user = user_answer.strip().upper()
-                normalized_correct = (
-                    correct_answer.strip().upper() if correct_answer else ""
-                )
-                is_correct = normalized_user == normalized_correct
+            if qtype == "single" and normalized_correct:
+                is_correct = stored_answer == normalized_correct
                 score = 1.0 if is_correct else 0.0
-
-            elif question.qtype == "multi":
-                # 多选题：完全对得1分，部分对得0.5分
-                normalized_user = self._normalize_multi_choice(user_answer)
-                normalized_correct = correct_answer if correct_answer else ""
-
-                if normalized_user == normalized_correct:
-                    is_correct = True
-                    score = 1.0
-                else:
-                    # 部分对：计算交集
-                    user_set = (
-                        set(normalized_user.split(",")) if normalized_user else set()
-                    )
-                    correct_set = (
-                        set(normalized_correct.split(","))
-                        if normalized_correct
-                        else set()
-                    )
-
-                    if user_set and correct_set:
-                        intersection = user_set & correct_set
-                        if intersection:
-                            score = 0.5  # 部分对
-                        else:
-                            score = 0.0
-                    else:
-                        score = 0.0
-
-            else:  # short
-                # 简答题：暂不判分（留给人工/AI）
+            elif qtype == "multi" and normalized_correct:
+                is_correct = stored_answer == normalized_correct
+                score = 1.0 if is_correct else 0.0
+            elif qtype in ("short", "text"):
                 is_correct = None
                 score = 0.0
-                correct_answer = None
-                explanation = "简答题需要人工判分"
+            elif normalized_correct is not None:
+                is_correct = stored_answer == normalized_correct
+                score = 1.0 if is_correct else 0.0
+            else:
+                is_correct = False
+                score = 0.0
 
             results.append(
                 {
                     "item_id": item.id,
                     "order_no": order_no,
-                    "answer": user_answer,
+                    "answer": stored_answer,
                     "is_correct": is_correct,
-                    "correct_answer": correct_answer,
-                    "explanation": explanation,
+                    "correct_answer": normalized_correct,
+                    "explanation": questions_repo.get_explanation(question)
+                    if question
+                    else None,
                     "score": score,
+                    "snapshot": snapshot,
                 }
             )
 
@@ -457,15 +475,16 @@ class QuizService:
         """
         items = []
         for result in grading_results:
+            snapshot = result.get("snapshot", {})
             items.append(
                 QuestionWithAnswer(
                     item_id=result["item_id"],
                     order_no=result["order_no"],
-                    snapshot={
-                        "qtype": "single",  # TODO: 从 snapshot 读取
-                        "stem": "",
-                        "choices": None,
-                    },
+                    snapshot=QuestionSnapshot(
+                        qtype=snapshot.get("qtype"),
+                        stem=snapshot.get("stem"),
+                        choices=snapshot.get("choices"),
+                    ),
                     your_answer=result["answer"],
                     is_correct=result["is_correct"],
                     correct_answer=result["correct_answer"],
