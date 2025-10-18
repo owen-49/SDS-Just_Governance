@@ -8,6 +8,14 @@ import Settings from './pages/Settings';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import IntroductoryQuestions from './pages/IntroductoryQuestions';
+import { 
+  GlobalAssessment, 
+  TopicQuiz, 
+  AssessmentHistory, 
+  AssessmentDetail 
+} from './pages/Assessment';
+import TopicList from './pages/Learning/TopicList';
+import TopicDetail from './pages/Learning/TopicDetail';
 import { authApi } from './services/auth';
 import VerifyEmail from './pages/VerifyEmail';
 
@@ -65,6 +73,16 @@ function App() {
           <Route path="/profile" element={user ? <Profile user={user} onBack={() => window.history.back()} /> : <Navigate to="/login" replace />} />
           <Route path="/settings" element={user ? <Settings user={user} onBack={() => window.history.back()} onSignOut={handleLogout} /> : <Navigate to="/login" replace />} />
           <Route path="/welcome" element={user ? <IntroductoryQuestions /> : <Navigate to="/login" replace />} />
+          
+          {/* Assessment pages */}
+          <Route path="/assessments/global" element={user ? <GlobalAssessment /> : <Navigate to="/login" replace />} />
+          <Route path="/assessments/history" element={user ? <AssessmentHistory /> : <Navigate to="/login" replace />} />
+          <Route path="/assessments/:sessionId" element={user ? <AssessmentDetail /> : <Navigate to="/login" replace />} />
+          <Route path="/topics/:topicId/quiz" element={user ? <TopicQuiz /> : <Navigate to="/login" replace />} />
+          
+          {/* Learning pages */}
+          <Route path="/learning/topics" element={user ? <TopicList /> : <Navigate to="/login" replace />} />
+          <Route path="/learning/topics/:topicId" element={user ? <TopicDetail /> : <Navigate to="/login" replace />} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
