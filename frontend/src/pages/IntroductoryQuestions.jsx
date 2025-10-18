@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentLayout } from '../components/layout';
-import { dbApi } from '../services/localDb';
 import { onboardingApi, transformAnswersToBackendFormat } from '../services/onboarding';
 
 const IntroductoryQuestions = () => {
@@ -41,7 +40,6 @@ const IntroductoryQuestions = () => {
   useEffect(() => {
     const loadSurveyResult = async () => {
       try {
-        // 尝试从后端获取结果
         const result = await onboardingApi.getResult();
         if (result) {
           setScore(result.score);
@@ -50,18 +48,9 @@ const IntroductoryQuestions = () => {
           setShowResults(true);
         }
       } catch (error) {
-        // 如果后端获取失败 (404 表示未提交过)，尝试从 localStorage 读取
+        // 404 表示未提交过，这是正常情况
         if (error.status !== 404) {
           console.error('Failed to load survey result from backend:', error);
-        }
-        // 降级：从 localStorage 读取
-        const rec = dbApi.getLatestIntroQuestionnaire();
-        if (rec?.data) {
-          setAnswers(prev => ({ ...prev, ...rec.data }));
-          setSavedAt(rec.created_at);
-          if (rec.data.score) {
-            setScore(rec.data.score);
-          }
         }
       }
     };
@@ -104,66 +93,15 @@ const IntroductoryQuestions = () => {
     setAnswers(prev => ({ ...prev, [key]: value }));
   };
 
-  const calculateScore = () => {
-    let totalScore = 0;
-    
-    // Q1 scoring
-    if (answers.q1 === 'Not at all confident') totalScore += 1;
-    else if (answers.q1 === 'Somewhat confident') totalScore += 2;
-    else if (answers.q1 === 'Very confident') totalScore += 3;
-    
-    // Q2 scoring - 1 point for each familiar term
-    const q2Familiar = Object.values(answers.q2).filter(val => val === 'Familiar').length;
-    totalScore += q2Familiar;
-    
-    // Q4 scoring
-    if (answers.q4 === 'Not familiar at all') totalScore += 1;
-    else if (answers.q4 === 'Somewhat familiar') totalScore += 2;
-    else if (answers.q4 === 'Very familiar') totalScore += 3;
-    
-    // Q5 scoring
-    if (answers.q5 === 'Not sure yet') totalScore += 1;
-    else if (answers.q5 === 'A rough idea') totalScore += 2;
-    else if (answers.q5 === 'Clear idea') totalScore += 3;
-    
-    // Q6 scoring
-    if (answers.q6 === 'No, never') totalScore += 1;
-    else if (answers.q6 === 'Yes, a few times') totalScore += 2;
-    else if (answers.q6 === 'Yes, often') totalScore += 3;
-    
-    // Q8 scoring
-    if (answers.q8 === 'Never') totalScore += 1;
-    else if (answers.q8 === 'Occasionally') totalScore += 2;
-    else if (answers.q8 === 'Often') totalScore += 3;
-    
-    // Q9 scoring
-    const unfamiliarTerms = answers.q9.length;
-    if (unfamiliarTerms === 0) totalScore += 3;
-    else if (unfamiliarTerms <= 3) totalScore += 2;
-    else totalScore += 1;
-    
-    // Q10 scoring
-    if (answers.q10 === 'Not very comfortable' || answers.q10 === 'Not sure') totalScore += 1;
-    else if (answers.q10 === 'Sometimes comfortable') totalScore += 2;
-    else if (answers.q10 === 'Very comfortable') totalScore += 3;
-    
-    // Q12 scoring
-    if (answers.q12 === 'Not interested') totalScore += 1;
-    else if (answers.q12 === 'Somewhat interested' || answers.q12 === 'Not sure yet') totalScore += 2;
-    else if (answers.q12 === 'Very interested') totalScore += 3;
-    
-    return totalScore;
-  };
-
   const getScoreCategory = (score, backendLevel = null) => {
-    // 如果后端提供了 level，使用后端的分类
+    // 使用后端返回的 level
     if (backendLevel) {
       if (backendLevel === 'strong') return 'Strong Understanding';
       if (backendLevel === 'developing') return 'Developing Understanding';
       if (backendLevel === 'new') return 'New to Governance';
     }
     
-    // 否则使用前端的分数范围判断（保持向后兼容）
+    // 降级：如果没有后端level，使用分数判断
     if (score <= 14) return 'New to Governance';
     else if (score <= 21) return 'Developing Understanding';
     else return 'Strong Understanding';
@@ -227,52 +165,24 @@ const IntroductoryQuestions = () => {
   };
 
   const onSubmit = async (e) => {
-    console.log('🎯 onSubmit function called!', e);
     e.preventDefault();
-    console.log('🔵 Submit button clicked!');
-    console.log('📝 Current answers:', answers);
-    
     setIsSubmitting(true);
     setSubmitError('');
     
     try {
-      // 1. 转换答案格式为后端期望的格式
-      console.log('🔄 Transforming answers...');
-      console.log('🔍 transformAnswersToBackendFormat function:', transformAnswersToBackendFormat);
+      // 转换答案格式为后端期望的格式
+      const backendAnswers = transformAnswersToBackendFormat(answers);
       
-      let backendAnswers;
-      try {
-        backendAnswers = transformAnswersToBackendFormat(answers);
-        console.log('✅ Transformed answers:', backendAnswers);
-      } catch (transformError) {
-        console.error('❌ Error during transformation:', transformError);
-        throw transformError;
-      }
+      // 提交到后端
+      const result = await onboardingApi.submitSurvey(backendAnswers);
       
-      // 2. 提交到后端
-      console.log('📤 Submitting to backend...');
-      console.log('🔍 onboardingApi:', onboardingApi);
-      console.log('🔍 Payload:', { answers: backendAnswers });
-      
-      let result;
-      try {
-        result = await onboardingApi.submitSurvey(backendAnswers);
-        console.log('✅ Backend response:', result);
-      } catch (apiError) {
-        console.error('❌ Error during API call:', apiError);
-        throw apiError;
-      }
-      
-      // 3. 更新前端状态
+      // 更新前端状态
       setScore(result.score);
       setLevel(result.level);
       setSavedAt(new Date().toISOString());
       setShowResults(true);
       
-      // 4. 同时保存到 localStorage 作为备份
-      dbApi.saveIntroQuestionnaire({ ...answers, score: result.score });
-      
-      // 5. 滚动到结果区域
+      // 滚动到结果区域
       setTimeout(() => {
         const resultsElement = document.getElementById('results-section');
         if (resultsElement) {
@@ -281,39 +191,47 @@ const IntroductoryQuestions = () => {
       }, 100);
       
     } catch (error) {
-      console.error('❌ Failed to submit survey to backend:', error);
-      console.error('❌ Error type:', error.constructor.name);
-      console.error('❌ Error details:', {
-        status: error.status,
-        message: error.message,
-        body: error.body,
-        stack: error.stack
-      });
+      console.error('Failed to submit survey:', error);
       
-      // 降级处理：如果后端提交失败，仍然保存到 localStorage
-      if (error.status === 409) {
-        // 已经提交过
-        setSubmitError('You have already submitted this questionnaire. Your previous submission has been saved.');
-        setShowResults(true);
-      } else if (error.status === 401) {
-        // 未登录
-        setSubmitError('⚠️ Please sign in first to submit the questionnaire. Click here to go to login page.');
-        alert('You need to sign in first! Please visit http://localhost:3000/login to create an account or sign in.');
-        // 可选：自动跳转到登录页
-        // window.location.href = '/login';
-      } else {
-        // 其他错误：计算本地分数并保存
-        const finalScore = calculateScore();
-        setScore(finalScore);
-        
-        const res = dbApi.saveIntroQuestionnaire({ ...answers, score: finalScore });
-        if (res.ok) {
-          setSavedAt(res.record.created_at);
+      // 根据API文档处理不同错误码
+      if (error.status === 401) {
+        // 401 code=1001 unauthenticated
+        setSubmitError('⚠️ Please sign in first to submit the questionnaire.');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else if (error.status === 409) {
+        // 409 code=4001 already_submitted / user_not_found_or_inactive / duplicate_question_key
+        const message = error.body?.message;
+        if (message === 'already_submitted') {
+          setSubmitError('You have already submitted this questionnaire.');
           setShowResults(true);
-          setSubmitError('Unable to submit to server. Your answers have been saved locally.');
+          // 尝试获取之前的结果
+          try {
+            const result = await onboardingApi.getResult();
+            if (result) {
+              setScore(result.score);
+              setLevel(result.level);
+              setSavedAt(result.submitted_at);
+            }
+          } catch (e) {
+            console.error('Failed to fetch previous result:', e);
+          }
+        } else if (message === 'duplicate_question_key') {
+          setSubmitError('Error: Duplicate questions detected. Please check your answers and try again.');
         } else {
-          setSubmitError('Failed to save. Please try again.');
+          setSubmitError('Unable to submit: ' + (message || 'Conflict error'));
         }
+      } else if (error.status === 422) {
+        // 422 code=2001 validation_error
+        setSubmitError('Validation error: Please check all required fields are filled correctly.');
+        console.error('Validation errors:', error.body?.data?.errors);
+      } else if (error.status === 400) {
+        // 400 code=4001 integrity_error
+        setSubmitError('Database error: Please try again or contact support.');
+      } else {
+        // 其他错误
+        setSubmitError('Failed to submit. Please check your connection and try again.');
       }
     } finally {
       setIsSubmitting(false);

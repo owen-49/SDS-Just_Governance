@@ -73,10 +73,17 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
 
   // Q2: Familiar terms (multi choice with nested structure)
   if (frontendAnswers.q2) {
+    const termMap = {
+      'Incorporated bodies': 'incorporated_bodies',
+      'Companies': 'companies',
+      'Not for profits': 'not_for_profits',
+      'Community organisations': 'community_orgs',
+      'Social enterprises': 'social_enterprises'
+    };
     const familiarTerms = [];
     Object.entries(frontendAnswers.q2).forEach(([term, familiarity]) => {
       if (familiarity === 'Familiar') {
-        const termValue = term.toLowerCase().replace(/ /g, '_');
+        const termValue = termMap[term] || term.toLowerCase().replace(/ /g, '_');
         familiarTerms.push(termValue);
       }
     });
@@ -90,9 +97,18 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
 
   // Q3: Interest motivation (multi choice with max 2, may have text)
   if (frontendAnswers.q3) {
-    const values = [...frontendAnswers.q3];
+    const valueMap = {
+      'Making a difference on an issue I care about': 'impact',
+      'Getting a board role': 'get_board_role',
+      'Learning new skills': 'learn_new_skills',
+      'Understanding how key decisions get made': 'understand_decisions',
+      'Meeting people and building networks': 'meet_and_network',
+      'Furthering my career': 'further_career',
+      'Other': 'other'
+    };
+    const values = frontendAnswers.q3.map(v => valueMap[v] || v.toLowerCase().replace(/ /g, '_'));
     let text = null;
-    if (values.includes('Other') && frontendAnswers.q3_other) {
+    if (frontendAnswers.q3_other && frontendAnswers.q3_other.trim()) {
       text = frontendAnswers.q3_other;
     }
     backendAnswers.push({
@@ -100,7 +116,7 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
       question_key: 'interest_motivation',
       question_type: 'multi_choice',
       value: values,
-      text: text
+      ...(text && { text })
     });
   }
 
@@ -142,9 +158,20 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
 
   // Q7: Interest areas (multi choice, may have text)
   if (frontendAnswers.q7) {
-    const values = [...frontendAnswers.q7];
+    const valueMap = {
+      'Community and social justice': 'social_justice',
+      'Sport and recreation': 'sport',
+      'Arts and culture': 'arts',
+      'Health': 'health',
+      'Housing and homelessness': 'housing',
+      'Gender': 'gender',
+      'Women\'s safety': 'womens_safety',
+      'Environment': 'environment',
+      'Other': 'other'
+    };
+    const values = frontendAnswers.q7.map(v => valueMap[v] || v.toLowerCase().replace(/ /g, '_'));
     let text = null;
-    if (values.includes('Other') && frontendAnswers.q7_other) {
+    if (frontendAnswers.q7_other && frontendAnswers.q7_other.trim()) {
       text = frontendAnswers.q7_other;
     }
     backendAnswers.push({
@@ -152,27 +179,42 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
       question_key: 'interest_areas',
       question_type: 'multi_choice',
       value: values,
-      text: text
+      ...(text && { text })
     });
   }
 
   // Q8: Financial experience (single choice)
   if (frontendAnswers.q8) {
+    const valueMap = {
+      'Never': 'never',
+      'Occasionally': 'occasionally',
+      'Often': 'often'
+    };
     backendAnswers.push({
       question_number: 8,
       question_key: 'financial_experience',
       question_type: 'single_choice',
-      value: frontendAnswers.q8.toLowerCase()
+      value: valueMap[frontendAnswers.q8] || frontendAnswers.q8.toLowerCase()
     });
   }
 
   // Q9: New terms (multi choice)
   if (frontendAnswers.q9) {
+    const valueMap = {
+      'Constitution': 'constitution',
+      'Director': 'director',
+      'Nominee': 'nominee',
+      'Conflict of interest': 'conflict_of_interest',
+      'Agenda': 'agenda',
+      'Minutes': 'minutes',
+      'Fiduciary duties': 'fiduciary_duties'
+    };
+    const values = frontendAnswers.q9.map(v => valueMap[v] || v.toLowerCase().replace(/ /g, '_'));
     backendAnswers.push({
       question_number: 9,
       question_key: 'new_terms',
       question_type: 'multi_choice',
-      value: frontendAnswers.q9
+      value: values
     });
   }
 
@@ -191,9 +233,19 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
 
   // Q11: Learning interest (multi choice with max 2, may have text)
   if (frontendAnswers.q11) {
-    const values = [...frontendAnswers.q11];
+    const valueMap = {
+      'What boards actually do': 'what_boards_do',
+      'How board decisions are made': 'decision_process',
+      'The legal duties and responsibilities of board members': 'legal_duties',
+      'How to get on a board': 'join_board',
+      'The different types of boards in Australia': 'board_types',
+      'When a board is needed and how to set one up': 'setup_board',
+      'Something else': 'other',
+      'Other': 'other'
+    };
+    const values = frontendAnswers.q11.map(v => valueMap[v] || v.toLowerCase().replace(/ /g, '_'));
     let text = null;
-    if (values.includes('Something else') && frontendAnswers.q11_other) {
+    if (frontendAnswers.q11_other && frontendAnswers.q11_other.trim()) {
       text = frontendAnswers.q11_other;
     }
     backendAnswers.push({
@@ -201,33 +253,38 @@ export function transformAnswersToBackendFormat(frontendAnswers) {
       question_key: 'learning_interest',
       question_type: 'multi_choice',
       value: values,
-      text: text
+      ...(text && { text })
     });
   }
 
-  // Q12: (Skipping as it's not in the backend definition - seems to be Q13 in frontend)
-  
-  // Q13: Training barriers (multi choice, may have text)
+  // Q12: (Previously Q13) Training barriers (multi choice, may have text)
   if (frontendAnswers.q13) {
-    const values = [...frontendAnswers.q13];
-    let text = null;
+    const valueMap = {
+      "Confidence or feeling unsure about what I know and don't know": 'confidence',
+      'Time or family commitments': 'time_commitments',
+      'Access to internet or computer': 'internet_access',
+      'Accessibility needs (please share)': 'accessibility_needs',
+      'Other': 'other',
+      'Nothing comes to mind': 'none'
+    };
+    const values = frontendAnswers.q13.map(v => valueMap[v] || v.toLowerCase().replace(/ /g, '_'));
+    
     // Combine text from multiple sources
     const textParts = [];
-    if (values.includes('Accessibility needs (please share)') && frontendAnswers.q13_accessibility) {
+    if (values.includes('accessibility_needs') && frontendAnswers.q13_accessibility) {
       textParts.push(`Accessibility: ${frontendAnswers.q13_accessibility}`);
     }
-    if (values.includes('Other') && frontendAnswers.q13_other) {
+    if (values.includes('other') && frontendAnswers.q13_other && frontendAnswers.q13_other.trim()) {
       textParts.push(`Other: ${frontendAnswers.q13_other}`);
     }
-    if (textParts.length > 0) {
-      text = textParts.join('; ');
-    }
+    const text = textParts.length > 0 ? textParts.join('; ') : null;
+    
     backendAnswers.push({
       question_number: 12,
       question_key: 'training_barriers',
       question_type: 'multi_choice',
       value: values,
-      text: text
+      ...(text && { text })
     });
   }
 
