@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Response, Depends, Cookie, HTTPException, BackgroundTasks, Query
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -21,6 +22,8 @@ from app.core.exceptions.exceptions import BizCode
 from app.models import User
 from app.models import UserSession
 from app.deps.auth import get_current_user
+
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -59,29 +62,87 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
     existing = result.scalar_one_or_none()
 
     if existing:
-        # 如果已存在账号：
         if existing.email_verified_at:
-            # 情况1）已验证：不重复创建，返回 409
+            # 情况1）已验证：返回 409，前端提示该账号已被注册
             raise BizError(409,BizCode.EMAIL_EXISTS,"email_exists")
         else:
-            # 情况2） 未验证：不重复创建，直接返回“registered”
+            # 情况2）未验证：返回特殊成功，前端跳转发送验证邮件
             return ok(data={
                 "user_id": str(existing.id),
                 "email": existing.email,
                 "need_verify": True
             })
+    # # 第二步：创建新的用户对象
+    # user = User(
+    #     id=uuid.uuid4(),
+    #     email=str(payload.email),
+    #     password_hash=hash_password(payload.password),
+    #     name=payload.name,
+    #     is_active=True,
+    # )
+    # db.add(user)
+    # await db.commit()
+    # return ok(data={"user_id": str(user.id), "email": user.email, "need_verify": True})
+    ###### UPSERT解决并发问题 ######
+    # —— 第二步：创建新的用户对象（将原来的 add+commit 改为 UPSERT）——
+    try:
+        stmt = (
+            pg_insert(User)
+            .values(
+                id=uuid.uuid4(),
+                email=str(payload.email),  # 如有 email 归一化，这里替换为规范化后的值
+                password_hash=hash_password(payload.password),
+                name=payload.name,
+                is_active=True,
+            )
+            .on_conflict_do_nothing(index_elements=[User.email])
+            .returning(User.id, User.email)  # 只有真正插入成功才会返回行
+        )
 
-    # 第二步：创建新的用户对象
-    user = User(
-        id=uuid.uuid4(),
-        email=str(payload.email),
-        password_hash=hash_password(payload.password),
-        name=payload.name,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    return ok(data={"user_id": str(user.id), "email": user.email, "need_verify": True})
+        row = (await db.execute(stmt)).first()
+        if row:
+            # 插入成功 → 提交并返回
+            await db.commit()
+            return ok(data={
+                "user_id": str(row.id),
+                "email": row.email,
+                "need_verify": True
+            })
+
+        # 没有返回行 → 说明发生了唯一冲突（并发或历史已存在），这一步没有写入
+        # 为了结束当前事务边界，这里做一次 rollback（可选但更干净）
+        await db.rollback()
+
+        # 再查一次，判断“已验证/未验证”，与第一次查时的语义对齐
+        result2 = await db.execute(select(User).where(User.email == payload.email))
+        existing2 = result2.scalar_one_or_none()
+
+        if existing2 is None:
+            # 极少数时序/读写分离导致此刻还看不到胜出事务
+            # 语义上可以视为存在竞争，需要客户端稍后重试
+            raise BizError(503, BizCode.TRY_AGAIN, "please_retry", headers={"Retry-After": "2"})
+
+        if existing2.email_verified_at:
+            raise BizError(409, BizCode.EMAIL_EXISTS, "email_exists")
+
+        return ok(data={
+            "user_id": str(existing2.id),
+            "email": existing2.email,
+            "need_verify": True
+        })
+
+    except IntegrityError as e:
+        await db.rollback()
+        sqlstate = getattr(getattr(e, "orig", None), "sqlstate", None)
+        if sqlstate == "23505":
+            raise BizError(409, BizCode.EMAIL_EXISTS, "email_exists") from e
+        # 其他约束（外键/检查等）你也可细分成 409/422
+        raise BizError(422, BizCode.VALIDATION_ERROR, "validation_error") from e
+
+    # 未知数据库故障：
+    except SQLAlchemyError as e:
+        await db.rollback()
+        raise e
 
 # 二、登录，成功后返回 access_token并通过 Cookie 设置 refresh_token，并记录登录 session（UserSession）。
 @router.post("/login", response_model=TokenOut)

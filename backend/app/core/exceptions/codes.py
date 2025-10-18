@@ -17,6 +17,7 @@ from dataclasses import dataclass
 # 业务码枚举类：防止乱填业务码
 class BizCode(IntEnum):
     # 成功
+    TRY_AGAIN = 9002
     OK = 0
 
     # 1xxx 鉴权/权限
