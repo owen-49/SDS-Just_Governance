@@ -133,6 +133,17 @@ function TopicList() {
 
   return (
     <div className="topic-list-container">
+      {/* Navigation */}
+      <div className="navigation-breadcrumb">
+        <button 
+          onClick={() => navigate('/')} 
+          className="back-link"
+          title="Back to Home"
+        >
+          ← Back to Home
+        </button>
+      </div>
+
       <header className="topic-list-header">
         <h1>📚 Learning Topics</h1>
         <p className="subtitle">Explore governance knowledge and enhance your expertise</p>

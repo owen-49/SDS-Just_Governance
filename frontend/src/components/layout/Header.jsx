@@ -121,6 +121,33 @@ export default function Header({ onToggleSidebar, onStartAssessment, onOpenOverv
           📚 Learning Hub
         </button>
         <button 
+          onClick={() => navigate('/admin')} 
+          style={{ 
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: '#fff', 
+            border: 'none', 
+            padding: '10px 16px', 
+            borderRadius: '8px',
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.4)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+          }}
+        >
+          🔧 Admin
+        </button>
+        <button 
           onClick={onStartAssessment} 
           style={{ 
             background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',

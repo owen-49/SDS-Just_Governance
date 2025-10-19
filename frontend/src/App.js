@@ -16,6 +16,7 @@ import {
 } from './pages/Assessment';
 import TopicList from './pages/Learning/TopicList';
 import TopicDetail from './pages/Learning/TopicDetail';
+import { AdminPanel, QuestionManager } from './pages/Admin';
 import { authApi } from './services/auth';
 import VerifyEmail from './pages/VerifyEmail';
 
@@ -83,6 +84,10 @@ function App() {
           {/* Learning pages */}
           <Route path="/learning/topics" element={user ? <TopicList /> : <Navigate to="/login" replace />} />
           <Route path="/learning/topics/:topicId" element={user ? <TopicDetail /> : <Navigate to="/login" replace />} />
+          
+          {/* Admin pages */}
+          <Route path="/admin" element={user ? <AdminPanel /> : <Navigate to="/login" replace />} />
+          <Route path="/admin/questions" element={user ? <QuestionManager /> : <Navigate to="/login" replace />} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

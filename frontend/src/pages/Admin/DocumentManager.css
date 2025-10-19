@@ -1,0 +1,184 @@
+/* frontend/src/pages/Admin/DocumentManager.css */
+
+.document-manager {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.document-form {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
+}
+
+.file-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px dashed #667eea;
+  border-radius: 8px;
+  background: #f8f9ff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file-input:hover {
+  background: #eef2ff;
+  border-color: #5568d3;
+}
+
+.chunks-help {
+  padding: 12px;
+  background: #eef2ff;
+  border-left: 4px solid #667eea;
+  border-radius: 6px;
+  margin: 8px 0 16px 0;
+  font-size: 0.95rem;
+  color: #495057;
+}
+
+.chunks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chunk-item {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.chunk-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.chunk-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.chunk-number {
+  font-weight: 700;
+  color: #667eea;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+.chunk-index-input {
+  width: 80px;
+  padding: 6px 10px;
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.btn-remove-chunk {
+  padding: 6px 14px;
+  background: #fee;
+  color: #c33;
+  border: 2px solid #fcc;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.btn-remove-chunk:hover:not(:disabled) {
+  background: #fcc;
+  border-color: #c33;
+}
+
+.btn-remove-chunk:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chunk-textarea {
+  width: 100%;
+  padding: 14px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  resize: vertical;
+  transition: all 0.3s ease;
+}
+
+.chunk-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.char-count {
+  display: block;
+  margin-top: 8px;
+  color: #6c757d;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.rag-info {
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  padding: 24px;
+  border-radius: 12px;
+  border: 2px solid #c7d2fe;
+}
+
+.rag-info h3 {
+  margin: 0 0 12px 0;
+  color: #4338ca;
+  font-size: 1.2rem;
+}
+
+.rag-info p {
+  margin: 0 0 16px 0;
+  color: #495057;
+  line-height: 1.6;
+}
+
+.rag-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.rag-info li {
+  padding: 10px 12px;
+  background: white;
+  border-radius: 6px;
+  color: #495057;
+  font-size: 0.95rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .document-manager {
+    padding: 16px;
+  }
+
+  .document-form {
+    padding: 20px;
+  }
+
+  .chunk-header {
+    flex-wrap: wrap;
+  }
+
+  .chunk-number {
+    flex-basis: 100%;
+  }
+}

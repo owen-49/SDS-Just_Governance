@@ -123,12 +123,26 @@ function TopicDetail() {
 
   return (
     <div className="topic-detail-container">
+      {/* Navigation Header */}
+      <div className="navigation-breadcrumb">
+        <button 
+          onClick={() => navigate('/learning/topics')} 
+          className="back-link"
+          title="Back to Learning Hub"
+        >
+          ← Back to Learning Hub
+        </button>
+        <button 
+          onClick={() => navigate('/')} 
+          className="home-link"
+          title="Back to Home"
+        >
+          🏠 Home
+        </button>
+      </div>
+
       {/* Header */}
       <header className="topic-detail-header">
-        <button onClick={() => navigate('/learning/topics')} className="back-link">
-          ← Back to List
-        </button>
-        
         <div className="header-content">
           <div className="header-left">
             <h1 className="topic-title">{topic.name}</h1>
