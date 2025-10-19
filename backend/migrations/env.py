@@ -49,6 +49,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_server_default=True,
+        render_as_batch=False,
     )
 
     with context.begin_transaction():
