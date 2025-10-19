@@ -5,8 +5,13 @@ from functools import lru_cache
 
 # OpenAI v1 SDK
 from openai import OpenAI
+from typing import Sequence, Mapping, Tuple, List, Any
+
 from app.core.config.config import OPENAI_API_KEY, PROMPT_PATH, OPENAI_MODEL
 from app.schemas.old.explain import ExplainOut
+import logging
+
+logger = logging.getLogger(__name__)
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY not set in .env")
@@ -93,3 +98,67 @@ async def ask_question(question: str, level: str) -> str:
     )
 
     return resp.choices[0].message.content.strip()
+
+
+def generate_assessment_feedback(
+    total_score: float, breakdown: Sequence[Mapping[str, Any]]
+) -> Tuple[str, List[str]]:
+    """
+    Generate a summary and suggested actions for an assessment result using OpenAI.
+    """
+    fallback_summary = (
+        f"Your overall score is {total_score:.1f}. Keep practising the areas that scored lower."
+    )
+    fallback_actions = [
+        "Review the weakest topics identified in this assessment.",
+        "Schedule focused practice sessions to reinforce understanding.",
+    ]
+
+    if not OPENAI_API_KEY:
+        return fallback_summary, fallback_actions
+
+    payload = [
+        {
+            "topic_name": str(item.get("topic_name", "")),
+            "score": float(item.get("score", 0.0)),
+            "correct": int(item.get("correct", 0)),
+            "total": int(item.get("total", 0)),
+        }
+        for item in breakdown
+    ]
+
+    prompt = (
+        "You are a governance skills coach.\n"
+        f"The learner's overall score is {total_score:.1f} out of 100.\n"
+        "Topic breakdown (JSON):\n"
+        f"{json.dumps(payload, ensure_ascii=False)}\n\n"
+        "Write a short encouragement summary (<= 60 words) and suggest two actionable next steps. "
+        "Respond strictly as JSON with keys 'summary' and 'suggested_actions' (array of short strings)."
+    )
+
+    try:
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", OPENAI_MODEL or "gpt-4o"),
+            messages=[
+                {"role": "system", "content": "You provide concise coaching feedback for assessments."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.6,
+            response_format={"type": "json_object"},
+        )
+        text = resp.choices[0].message.content.strip()
+        data = json.loads(text)
+        summary = data.get("summary")
+        actions = data.get("suggested_actions")
+
+        if not summary or not isinstance(actions, list):
+            raise ValueError("Invalid structure from model")
+
+        actions = [str(action).strip() for action in actions if str(action).strip()]
+        if not actions:
+            actions = fallback_actions
+
+        return summary.strip(), actions[:5]
+    except Exception as exc:
+        logger.warning("AI feedback generation failed: %s", exc)
+        return fallback_summary, fallback_actions

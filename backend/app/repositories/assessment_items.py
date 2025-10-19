@@ -83,6 +83,7 @@ async def create_items_batch(
     for idx, question in enumerate(questions, start=1):
         # 构建快照：仅包含前端需要的字段，不含答案
         snapshot = {
+            "question_id": str(question.id),
             "qtype": question.qtype,
             "stem": question.stem,
             "choices": question.choices,  # JSONB 格式

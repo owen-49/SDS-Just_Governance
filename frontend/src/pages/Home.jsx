@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useNavigate } from 'react-router-dom';
 import { Header, Sidebar } from '../components/layout';
 import { Modal } from '../components/ui';
-import { AssessmentModal, GlobalChat } from '../components/features';
+import { GlobalChat } from '../components/features';
 import { dbApi } from '../services/localDb';
 import { sections as fallbackSections } from '../constants/structure';
 import { aiAsk } from '../services/api';
@@ -1944,6 +1945,7 @@ function ScenarioSim({ topic }) {
 
 // Main Home Component
 export default function Home({ user, onSignOut }) {
+  const navigate = useNavigate();
   const [structure, setStructure] = useState(() => fallbackSections);
   const [structureSource, setStructureSource] = useState('local');
   const [structureLoading, setStructureLoading] = useState(true);
@@ -1951,7 +1953,6 @@ export default function Home({ user, onSignOut }) {
   const [topicsIndex, setTopicsIndex] = useState(() => buildTopicIndex(fallbackSections));
   const [topicId, setTopicId] = useState(null);
   const [showOverview, setShowOverview] = useState(false);
-  const [showAssessment, setShowAssessment] = useState(false);
   const [navUi, setNavUi] = useState({
     collapsed: false,
     sectionsOpen: {},
@@ -1960,6 +1961,7 @@ export default function Home({ user, onSignOut }) {
 
   const onSelectTopic = (id) => setTopicId(id);
   const onBackToHome = () => setTopicId(null);
+  const onStartAssessment = () => navigate('/assessments/global');
   
   const onToggleCollapsed = () => {
     setNavUi(prev => ({ ...prev, collapsed: !prev.collapsed }));
@@ -2047,11 +2049,11 @@ export default function Home({ user, onSignOut }) {
         <Header 
           user={user}
           onOpenOverview={() => setShowOverview(true)}
-          onStartAssessment={() => setShowAssessment(true)}
           onToggleSidebar={onToggleCollapsed}
           onBackToHome={onBackToHome}
           onSignOut={onSignOut}
           onProfile={() => console.log('Profile clicked')}
+          onStartAssessment={onStartAssessment}
           currentTopicId={topicId}
         />
         
@@ -2130,18 +2132,6 @@ export default function Home({ user, onSignOut }) {
           </div>
         </div>
       </Modal>
-
-      <AssessmentModal 
-        open={showAssessment} 
-        onClose={() => setShowAssessment(false)} 
-        onSubmit={(res) => {
-          dbApi.addAssessmentRecord(user.email, { 
-            score: res.score, 
-            breakdown: [], 
-            advice: 'Focus on core modules' 
-          });
-        }} 
-      />
     </div>
   );
 }

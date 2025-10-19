@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 @router.post(
     "/topics/{topic_id}/quiz/pending",
     response_model=ApiResponse[QuizPendingOut],
-    summary="生成/获取待做题单（主题小测）",
+    summary="Generate or fetch pending quiz (topic quiz)",
 )
 async def get_or_create_quiz_pending(
     topic_id: UUID,
@@ -55,7 +55,7 @@ async def get_or_create_quiz_pending(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """生成/获取待做题单（主题小测）"""
+    """Generate or fetch a pending quiz for the specified topic."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
@@ -120,7 +120,7 @@ async def get_or_create_quiz_pending(
 @router.post(
     "/topics/{topic_id}/quiz/submit",
     response_model=ApiResponse[QuizSubmitOut],
-    summary="提交主题小测并判分",
+    summary="Submit topic quiz and grade",
 )
 async def submit_topic_quiz(
     topic_id: UUID,
@@ -129,7 +129,7 @@ async def submit_topic_quiz(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """提交主题小测并判分"""
+    """Submit the topic quiz answers and return grading results."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
@@ -201,7 +201,7 @@ async def submit_topic_quiz(
 @router.post(
     "/assessments/global/start",
     response_model=ApiResponse[AssessmentStartOut],
-    summary="开始整体评测（创建会话+出题）",
+    summary="Start global assessment (create session & generate questions)",
 )
 async def start_global_assessment(
     request: Request,
@@ -209,7 +209,7 @@ async def start_global_assessment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """开始整体评测（创建会话+出题）"""
+    """Start a new global assessment session and generate questions."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
@@ -271,7 +271,7 @@ async def start_global_assessment(
 @router.post(
     "/assessments/{session_id}/answer",
     response_model=ApiResponse[AnswerSaveOut],
-    summary="逐题保存答案（自动保存）",
+    summary="Save answer for current question (auto-save)",
 )
 async def save_answer(
     session_id: UUID,
@@ -280,7 +280,7 @@ async def save_answer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """逐题保存答案（自动保存）"""
+    """Save the current answer for the session (auto-save)."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
@@ -346,16 +346,16 @@ async def save_answer(
 @router.post(
     "/assessments/{session_id}/submit",
     response_model=ApiResponse[AssessmentSubmitOut],
-    summary="提交整体评测（汇总评分+AI总结）",
+    summary="Submit global assessment (score & AI summary)",
 )
 async def submit_global_assessment(
     session_id: UUID,
     request: Request,
-    force: bool = Query(False, description="强制提交（有未答题时）"),
+    force: bool = Query(False, description="Force submit even if some answers are missing"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """提交整体评测（汇总评分+AI总结）"""
+    """Submit the global assessment, compute scores, and generate AI summary."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
@@ -421,7 +421,7 @@ async def submit_global_assessment(
 @router.get(
     "/assessments/history",
     response_model=ApiResponse[AssessmentHistoryOut],
-    summary="查看评测历史（个人中心）",
+    summary="Get assessment history (user center)",
 )
 async def get_assessment_history(
     request: Request,
@@ -430,7 +430,7 @@ async def get_assessment_history(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """查看评测历史（个人中心）"""
+    """Retrieve the authenticated user's assessment history."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
@@ -494,7 +494,7 @@ async def get_assessment_history(
 @router.get(
     "/assessments/{session_id}",
     response_model=ApiResponse[AssessmentDetailOut],
-    summary="查看评测详情（逐题回放）",
+    summary="Get assessment detail (per-question review)",
 )
 async def get_assessment_detail(
     session_id: UUID,
@@ -502,7 +502,7 @@ async def get_assessment_detail(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """查看评测详情（逐题回放）"""
+    """Retrieve the detailed per-question review for a submitted assessment."""
     request_id = (
         request.state.request_id if hasattr(request.state, "request_id") else None
     )
