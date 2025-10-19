@@ -1,4 +1,7 @@
-import { http, request } from '../services/http';
+import { request } from '../services/http';
+
+// Re-export request for other modules
+export { request } from '../services/http';
 
 // Consider changing this to an environment variable or relative path for production.
 // const API_BASE = "http://localhost:8000";

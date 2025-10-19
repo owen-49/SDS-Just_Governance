@@ -151,7 +151,7 @@ async function listModules(boardId, { page = 1, size = 100, sort = 'sort_order',
   return result;
 }
 
-async function listTopics(moduleId, { page = 1, size = 200, sort = 'sort_order', order = 'asc' } = {}) {
+async function listTopics(moduleId, { page = 1, size = 100, sort = 'sort_order', order = 'asc' } = {}) {
   const cached = getCache('topics', moduleId);
   if (cached) return cached;
   
@@ -289,7 +289,7 @@ async function fetchStructure() {
             boardId: boardContext.boardId,
           };
 
-          const topicsPayload = await listTopics(module.module_id, { size: 200 });
+          const topicsPayload = await listTopics(module.module_id, { size: 100 });
           const topicItems = (topicsPayload?.items ?? []).filter((topic) => topic.is_active !== false);
           const topics = topicItems
             .map((topic) => buildTopicNode(moduleContext, topic))
