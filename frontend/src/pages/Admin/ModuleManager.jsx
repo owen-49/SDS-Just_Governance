@@ -112,11 +112,17 @@ const ModuleManager = () => {
               required
             >
               <option value="">-- Select a board --</option>
-              {boards.map(board => (
-                <option key={board.id} value={board.id}>
-                  {board.name}
-                </option>
-              ))}
+              {boards.map(board => {
+                const boardValue = board.board_id || board.id;
+                if (!boardValue) {
+                  return null;
+                }
+                return (
+                  <option key={boardValue} value={boardValue}>
+                    {board.name}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
