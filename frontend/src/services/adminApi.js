@@ -310,12 +310,22 @@ export const adminApi = {
    * @returns {Promise}
    */
   async uploadDocument(topicId, data) {
-    const response = await request(`${BASE_URL}/topics/${topicId}/documents`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    invalidateCache(['topics']);
-    return response.data;
+    try {
+      console.log('📤 Uploading document to topic:', topicId);
+      console.log('📝 Document data:', data);
+      
+      const response = await request(`${BASE_URL}/topics/${topicId}/documents`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      console.log('✅ Document upload response:', response);
+      invalidateCache(['topics']);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Document upload failed:', error);
+      throw error;
+    }
   },
 
   // ============================================

@@ -138,7 +138,9 @@ export async function request(input, init = {}) {
   }
 
   if (res.status >= 500) {
-    const err = new Error(ERROR_MESSAGES.server_error);
+    // 尝试从 body 中获取更详细的错误信息
+    const detailMessage = errorBody?.detail || errorBody?.message;
+    const err = new Error(detailMessage || ERROR_MESSAGES.server_error);
     err.status = res.status;
     err.body = errorBody;
     err.retryAfter = retryAfter;

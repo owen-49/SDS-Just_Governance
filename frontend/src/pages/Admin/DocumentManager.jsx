@@ -28,9 +28,10 @@ const DocumentManager = () => {
   const loadTopics = async () => {
     try {
       const data = await adminApi.getTopics();
+      console.log('📚 Loaded topics for document upload:', data);
       setTopics(data);
     } catch (err) {
-      console.error('Failed to load topics:', err);
+      console.error('❌ Failed to load topics:', err);
       setError('Failed to load topics');
     }
   };
@@ -55,7 +56,7 @@ const DocumentManager = () => {
     setIsLoading(true);
 
     try {
-      await adminApi.uploadDocument(selectedTopic, {
+      const payload = {
         title: formData.title || null,
         source: formData.source || null,
         metadata: Object.keys(formData.metadata).length > 0 ? formData.metadata : null,
@@ -63,7 +64,11 @@ const DocumentManager = () => {
           content: chunk.content,
           chunk_index: chunk.chunk_index !== null ? chunk.chunk_index : index,
         })),
-      });
+      };
+
+      console.log('📤 Uploading document with payload:', payload);
+      
+      await adminApi.uploadDocument(selectedTopic, payload);
 
       setSuccess('Document uploaded successfully! RAG embeddings are being generated.');
       
@@ -77,8 +82,24 @@ const DocumentManager = () => {
 
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      console.error('Failed to upload document:', err);
-      setError(err.message || 'Failed to upload document');
+      console.error('❌ Failed to upload document:', err);
+      
+      // Extract detailed error message
+      let errorMessage = 'Failed to upload document';
+      if (err.body?.message) {
+        errorMessage = err.body.message;
+      } else if (err.body?.detail) {
+        errorMessage = err.body.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // Add status code if available
+      if (err.status) {
+        errorMessage = `${errorMessage} (Status: ${err.status})`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -165,7 +186,7 @@ const DocumentManager = () => {
           >
             <option value="">-- Select a topic --</option>
             {topics.map(topic => (
-              <option key={topic.id} value={topic.id}>
+              <option key={topic.id || topic.topic_id} value={topic.id || topic.topic_id}>
                 {topic.board} / {topic.module} / {topic.title}
               </option>
             ))}
