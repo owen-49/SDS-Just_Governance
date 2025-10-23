@@ -22,7 +22,7 @@ export const assessmentApi = {
     const response = await request(`${BASE_URL}/topics/${topicId}/quiz/pending`, {
       method: 'POST'
     });
-    return response;
+    return response?.data ?? response;
   },
 
   /**
@@ -37,7 +37,7 @@ export const assessmentApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers })
     });
-    return response;
+    return response?.data ?? response;
   },
 
   // ========================================
@@ -125,7 +125,8 @@ export const ERROR_MESSAGES = {
   
   // 409 conflicts
   'no_pending_quiz': 'No pending quiz found. Please start a new quiz.',
-  'unfinished_assessment_exists': 'You have an unfinished assessment. Please continue or discard it.',
+  'unfinished_assessment_exists': 'You have an unfinished quiz. Please complete it first or go to the Quiz page to continue.',
+  'unfinished_assessment': 'You have an unfinished quiz. Please complete it first or go to the Quiz page to continue.',
   'assessment_already_submitted': 'This assessment has already been submitted.',
   
   // 422 validation

@@ -45,7 +45,8 @@ function TopicDetail() {
 
   async function handleStartQuiz() {
     try {
-      navigate(`/learning/topics/${topicId}/quiz`);
+      // 修复路由：应该是 /topics/:topicId/quiz 而不是 /learning/topics/:topicId/quiz
+      navigate(`/topics/${topicId}/quiz`);
     } catch (err) {
       console.error('Start quiz error:', err);
       alert('Failed to start quiz: ' + (err.message || 'Unknown error'));
@@ -143,21 +144,27 @@ function TopicDetail() {
 
       {/* Header */}
       <header className="topic-detail-header">
-        <div className="header-content">
-          <div className="header-left">
-            <h1 className="topic-title">{topic.name}</h1>
-            <span 
-              className="topic-status-badge"
-              style={{ backgroundColor: getProgressColor(progress?.progress_status) }}
-            >
-              {getProgressText(progress?.progress_status)}
-            </span>
-          </div>
+        <div className="header-content" style={{ 
+          textAlign: 'center', 
+          padding: '40px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '24px'
+        }}>
+          <h1 className="topic-title" style={{ 
+            textAlign: 'center',
+            fontSize: '28px',
+            fontWeight: '700',
+            color: '#0f172a',
+            margin: 0,
+            lineHeight: '1.3',
+            maxWidth: '800px'
+          }}>
+            {topic.name}
+          </h1>
 
           <div className="header-actions">
-            <button onClick={handleStartQuiz} className="quiz-button">
-              📝 Start Quiz
-            </button>
             {canMarkComplete() && (
               <button onClick={handleMarkComplete} className="complete-button">
                 ✓ Mark Complete

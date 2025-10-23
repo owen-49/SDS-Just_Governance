@@ -192,7 +192,9 @@ async function searchTopicRag(topicId, query, { limit = 5 } = {}) {
 
 async function startTopicQuiz(topicId, { limit } = {}) {
   const search = limit ? `?limit=${encodeURIComponent(limit)}` : '';
-  const body = await request(`/api/v1/topics/${topicId}/quiz/start${search}`);
+  const body = await request(`/api/v1/topics/${topicId}/quiz/start${search}`, {
+    method: 'POST',
+  });
   return unwrap(body);
 }
 

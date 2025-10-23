@@ -26,17 +26,34 @@ const TopicQuiz = () => {
     loadQuiz();
   }, [topicId]);
 
+  const normalizeQuizData = (resp) => {
+    const questions = Array.isArray(resp?.questions)
+      ? resp.questions
+      : Array.isArray(resp?.items)
+        ? resp.items
+        : [];
+    return { ...resp, questions };
+  };
+
   const loadQuiz = async () => {
     setError('');
     setIsLoading(true);
     
     try {
       const response = await assessmentApi.getPendingQuiz(topicId);
-      setQuizData(response);
-      setStage(response.quiz_state === 'pending' ? 'pending' : 'taking');
+      const normalized = normalizeQuizData(response);
+      setQuizData(normalized);
+      setStage(normalized.quiz_state === 'pending' ? 'pending' : 'taking');
     } catch (err) {
       console.error('Failed to load quiz:', err);
-      setError(getErrorMessage(err));
+      const errorMessage = getErrorMessage(err);
+      
+      // 检查是否是"unfinished assessment"错误
+      if (err.body?.message?.includes('unfinished') || errorMessage.includes('unfinished')) {
+        setError(`You have an unfinished quiz for this topic. Please complete it or wait for it to be cleared before starting a new one.`);
+      } else {
+        setError(errorMessage);
+      }
       setStage('error');
     } finally {
       setIsLoading(false);
@@ -58,7 +75,7 @@ const TopicQuiz = () => {
 
   // Navigation
   const handleNext = () => {
-    if (currentIndex < quizData.questions.length - 1) {
+    if (quizData && Array.isArray(quizData.questions) && currentIndex < quizData.questions.length - 1) {
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -274,14 +291,14 @@ const TopicQuiz = () => {
               📚 Topic Quiz Ready
             </h1>
             <p style={{ fontSize: '18px', opacity: 0.95 }}>
-              Test your knowledge on this specific topic with {quizData.items?.length || 0} questions.
+              Test your knowledge on this specific topic with {quizData.questions?.length || 0} questions.
             </p>
           </div>
 
           <div style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)', marginBottom: '24px' }}>
             <h3 style={{ marginBottom: '16px', color: '#1e293b' }}>Quiz Information</h3>
             <ul style={{ lineHeight: '1.8', color: '#475569', margin: 0 }}>
-              <li><strong>Questions:</strong> {quizData.items?.length || 0}</li>
+              <li><strong>Questions:</strong> {quizData.questions?.length || 0}</li>
               <li><strong>Status:</strong> <span style={{ color: '#f59e0b', fontWeight: '600' }}>Pending</span></li>
               <li><strong>Auto-graded:</strong> Instant results after submission</li>
             </ul>
@@ -311,8 +328,9 @@ const TopicQuiz = () => {
 
   // Taking stage
   if (stage === 'taking' && quizData) {
+    const total = Array.isArray(quizData.questions) ? quizData.questions.length : 0;
     const answeredCount = Object.keys(answers).length;
-    const progressPercent = quizData.items.length > 0 ? (answeredCount / quizData.items.length) * 100 : 0;
+    const progressPercent = total > 0 ? (answeredCount / total) * 100 : 0;
 
     return (
       <DocumentLayout title="Taking Quiz" lastUpdated="October 18, 2025">
@@ -320,7 +338,7 @@ const TopicQuiz = () => {
           <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)', marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
               <span style={{ fontWeight: '600', color: '#1e293b' }}>
-                Progress: {answeredCount} / {quizData.items.length} answered
+                Progress: {answeredCount} / {total} answered
               </span>
               <span style={{ color: '#6b7280' }}>{Math.round(progressPercent)}%</span>
             </div>
@@ -356,7 +374,7 @@ const TopicQuiz = () => {
                 ← Previous
               </button>
 
-              {currentIndex === quizData.items.length - 1 ? (
+              {currentIndex === Math.max(0, total - 1) ? (
                 <button
                   onClick={handleSubmit}
                   disabled={isLoading}
@@ -398,7 +416,7 @@ const TopicQuiz = () => {
           <div style={{ background: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
             <h4 style={{ marginBottom: '16px', color: '#1e293b' }}>Question Navigator</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(50px, 1fr))', gap: '8px' }}>
-              {quizData.items.map((q, idx) => {
+              {(quizData.questions || []).map((q, idx) => {
                 const isAnswered = answers[q.item_id];
                 const isCurrent = idx === currentIndex;
                 
