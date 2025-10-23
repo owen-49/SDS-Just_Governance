@@ -189,17 +189,19 @@ function TopicList() {
           {topics.map(topic => (
             <div
               key={topic.topic_id}
-              className="topic-card"
+              className="topic-card topic-card-enhanced"
               onClick={() => navigate(`/learning/topics/${topic.topic_id}`)}
             >
-              <div className="topic-card-header">
-                <h3 className="topic-name">{topic.name}</h3>
-                <span 
-                  className="topic-status"
-                  style={{ backgroundColor: getProgressColor(topic.progress_status) }}
-                >
-                  {getProgressText(topic.progress_status)}
-                </span>
+              <div className="topic-card-header" style={{ textAlign: 'center', padding: '32px 24px' }}>
+                <h3 className="topic-name" style={{ 
+                  textAlign: 'center', 
+                  fontSize: '20px', 
+                  fontWeight: '700',
+                  margin: 0,
+                  lineHeight: '1.4'
+                }}>
+                  {topic.name}
+                </h3>
               </div>
 
               <div className="topic-card-body">

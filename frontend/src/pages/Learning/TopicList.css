@@ -144,8 +144,8 @@
 /* Topics Grid */
 .topics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 24px;
   margin-top: 24px;
 }
 
@@ -163,6 +163,16 @@
 .topic-card:hover {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
   transform: translateY(-4px);
+}
+
+/* Enhanced topic card with larger size and centered title */
+.topic-card-enhanced {
+  min-height: 280px;
+}
+
+.topic-card-enhanced .topic-card-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 2px solid #e2e8f0;
 }
 
 .topic-card-header {

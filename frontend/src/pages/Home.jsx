@@ -1074,39 +1074,120 @@ function TopicPage({ topicId, topicRef, source, email, onBack }) {
                   </div>
                 ) : (
                   <div style={{
-                    marginTop: 20,
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 16,
-                    border: '1px dashed #dbeafe',
-                    borderRadius: 16,
-                    padding: '18px 20px',
-                    background: '#f8fafc',
+                    marginTop: 24,
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderRadius: 20,
+                    padding: '28px 32px',
+                    border: '2px solid #bfdbfe',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}>
-                    <div style={{ fontSize: 14, color: '#475569', maxWidth: 480 }}>
-                      {isEligibleForQuiz
-                        ? 'Take the short quiz to lock in your learning. You can retry as many times as you like.'
-                        : 'Review the topic content first, then come back for a quick knowledge check.'}
+                    {/* 装饰性背景 */}
+                    <div style={{
+                      position: 'absolute',
+                      top: -50,
+                      right: -50,
+                      width: 200,
+                      height: 200,
+                      background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 20, 
+                      flexWrap: 'wrap',
+                      position: 'relative',
+                      zIndex: 1
+                    }}>
+                      {/* 图标 */}
+                      <div style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 16,
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 28,
+                        boxShadow: '0 8px 20px rgba(59,130,246,0.3)',
+                        flexShrink: 0
+                      }}>
+                        📝
+                      </div>
+                      
+                      {/* 文字内容 */}
+                      <div style={{ flex: 1, minWidth: 280 }}>
+                        <h4 style={{ 
+                          margin: '0 0 8px 0', 
+                          fontSize: 18, 
+                          fontWeight: 700, 
+                          color: '#0f172a',
+                          letterSpacing: -0.2
+                        }}>
+                          {isEligibleForQuiz ? 'Ready to test your knowledge?' : 'Quiz locked'}
+                        </h4>
+                        <p style={{ 
+                          margin: 0, 
+                          fontSize: 14, 
+                          color: '#475569',
+                          lineHeight: 1.6
+                        }}>
+                          {isEligibleForQuiz
+                            ? 'Take the short quiz to lock in your learning. You can retry as many times as you like.'
+                            : 'Review the topic content first, then come back for a quick knowledge check.'}
+                        </p>
+                      </div>
+                      
+                      {/* 按钮 */}
+                      <button
+                        type="button"
+                        onClick={handleStartQuiz}
+                        disabled={!isEligibleForQuiz || quizLoading}
+                        style={{
+                          padding: '14px 28px',
+                          borderRadius: 12,
+                          border: 'none',
+                          background: !isEligibleForQuiz || quizLoading 
+                            ? 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)' 
+                            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                          color: '#fff',
+                          fontSize: 15,
+                          fontWeight: 700,
+                          cursor: !isEligibleForQuiz || quizLoading ? 'not-allowed' : 'pointer',
+                          boxShadow: !isEligibleForQuiz || quizLoading 
+                            ? 'none' 
+                            : '0 8px 20px rgba(37,99,235,0.35)',
+                          transition: 'all 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          whiteSpace: 'nowrap',
+                          letterSpacing: 0.3
+                        }}
+                        onMouseOver={(e) => {
+                          if (isEligibleForQuiz && !quizLoading) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 12px 28px rgba(37,99,235,0.45)';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (isEligibleForQuiz && !quizLoading) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(37,99,235,0.35)';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>
+                          {progress.quizState === 'pending' ? '▶️' : '🚀'}
+                        </span>
+                        <span>
+                          {progress.quizState === 'pending' ? 'Resume Quiz' : 'Start Quiz'}
+                        </span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleStartQuiz}
-                      disabled={!isEligibleForQuiz || quizLoading}
-                      style={{
-                        padding: '12px 18px',
-                        borderRadius: 12,
-                        border: 'none',
-                        background: !isEligibleForQuiz || quizLoading ? '#cbd5f5' : '#2563eb',
-                        color: '#fff',
-                        fontWeight: 600,
-                        cursor: !isEligibleForQuiz || quizLoading ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 8px 18px rgba(37,99,235,0.25)',
-                      }}
-                    >
-                      {progress.quizState === 'pending' ? 'Resume quiz' : 'Start quiz'}
-                    </button>
                   </div>
                 )}
               </section>
@@ -1835,110 +1916,588 @@ function TopicChat({ topicId, email, chat, setChat }) {
   );
 }
 
-// ScenarioSim Component - handles scenario simulations
+// ScenarioSim Component - handles topic quiz practice
 function ScenarioSim({ topic }) {
-  const [started, setStarted] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [decisions, setDecisions] = useState([]);
+  const { startTopicQuiz, submitTopicQuiz } = learningApi;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [quizSession, setQuizSession] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState(null);
 
-  const scenarios = [
-    {
-      title: "Board Meeting Challenge",
-      description: "Navigate a complex board decision scenario",
-      steps: [
-        {
-          situation: "The board is divided on a major strategic decision...",
-          options: ["Call for more data", "Push for immediate vote", "Suggest compromise"]
+  const startQuiz = async () => {
+    console.log('🎯 startQuiz called');
+    console.log('🎯 topic object:', topic);
+    console.log('🎯 topic.id:', topic?.id);
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('🚀 Starting quiz for topic:', topic.id);
+      const data = await startTopicQuiz(topic.id, { limit: 5 });
+      console.log('✅ Quiz data received:', data);
+      setQuizSession(data.quiz_session_id);
+      setQuestions(data.questions || []);
+      setCurrentQuestionIndex(0);
+      setAnswers({});
+      setSubmitted(false);
+      setResult(null);
+    } catch (err) {
+      console.error('❌ Failed to start quiz - Full error:', err);
+      console.error('❌ Error status:', err.status);
+      console.error('❌ Error body:', err.body);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Error stack:', err.stack);
+      
+      // 提取错误信息
+      let errorMessage = 'Failed to load practice questions. Please try again.';
+      
+      if (err.status === 409 && err.body) {
+        const bodyMessage = err.body?.message || err.body?.data?.message || '';
+        
+        // 检查是否是未完成评测的错误
+        if (bodyMessage.includes('unfinished_assessment') || bodyMessage.includes('unfinished assessment')) {
+          errorMessage = '⚠️ You have an unfinished quiz. Please go to the Quiz page to continue or complete it first, then come back to start a new one.';
+          console.log('⚠️ 409 error - unfinished assessment');
+        } else if (err.body.data?.available !== undefined) {
+          // 题目不足的情况
+          const available = err.body.data.available || 0;
+          const required = err.body.data.required || 5;
+          errorMessage = `Not enough practice questions available for this topic yet. Found ${available} questions, but ${required} are needed. We're working on adding more content!`;
+          console.log('⚠️ 409 error - insufficient questions:', { available, required });
+        } else {
+          // 其他409错误
+          errorMessage = bodyMessage || 'There is a conflict with your quiz status. Please refresh the page and try again.';
+          console.log('⚠️ 409 error - other conflict:', bodyMessage);
         }
-      ]
+      } else if (err.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+        console.log('⚠️ 401 error - unauthorized');
+      } else if (err.status === 404) {
+        errorMessage = 'Quiz endpoint not found. Please contact support.';
+        console.log('⚠️ 404 error - not found');
+      } else if (err.body?.message) {
+        errorMessage = err.body.message;
+        console.log('⚠️ Using error body message:', errorMessage);
+      } else if (err.message) {
+        errorMessage = err.message;
+        console.log('⚠️ Using error message:', errorMessage);
+      }
+      
+      console.log('📝 Setting error state to:', errorMessage);
+      setError(errorMessage);
+      console.log('📝 Error state set complete');
+    } finally {
+      console.log('🏁 Finally block - setting loading to false');
+      setLoading(false);
     }
-  ];
+  };
 
-  const scenario = scenarios[0];
+  const handleAnswer = (itemId, value) => {
+    setAnswers(prev => ({
+      ...prev,
+      [itemId]: value
+    }));
+  };
 
-  if (!started) {
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await submitTopicQuiz(topic.id, quizSession, answers);
+      setResult(data);
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Failed to submit quiz:', err);
+      setError(err.message || 'Failed to submit answers. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetQuiz = () => {
+    setQuizSession(null);
+    setQuestions([]);
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setSubmitted(false);
+    setResult(null);
+    setError(null);
+  };
+
+  // 未开始状态
+  if (!quizSession) {
+    console.log('🔍 ScenarioSim render - not started state');
+    console.log('🔍 error state:', error);
+    console.log('🔍 loading state:', loading);
+    
     return (
       <div style={{ padding: 40, textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
-        <h2>Interactive Scenario</h2>
-        <div style={{ 
-          padding: 24, 
-          backgroundColor: '#f0f9ff', 
-          borderRadius: 12, 
-          marginBottom: 24 
-        }}>
-          <h3>{scenario.title}</h3>
-          <p>{scenario.description}</p>
-        </div>
+        <div style={{ fontSize: '48px', marginBottom: 20 }}>🎯</div>
+        <h2 style={{ marginBottom: 16 }}>Practice Quiz</h2>
+        <p style={{ color: '#64748b', marginBottom: 32, lineHeight: 1.6 }}>
+          Test your understanding with interactive practice questions. 
+          Answer all questions to see your score and get feedback.
+        </p>
+        {error && (
+          <div style={{
+            padding: '20px 24px',
+            marginBottom: 24,
+            backgroundColor: '#fef3c7',
+            color: '#92400e',
+            borderRadius: 12,
+            border: '2px solid #fbbf24',
+            textAlign: 'left',
+            lineHeight: 1.6
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start', 
+              gap: 12 
+            }}>
+              <span style={{ fontSize: 24, flexShrink: 0 }}>⚠️</span>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>
+                  Unable to Start Quiz
+                </div>
+                <div style={{ fontSize: 14 }}>
+                  {error}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {!error && (
+          <div style={{ 
+            padding: '12px', 
+            marginBottom: 16, 
+            backgroundColor: '#e0f2fe', 
+            color: '#0369a1',
+            borderRadius: 8,
+            fontSize: 13 
+          }}>
+            Debug: No error set yet. Click button to start quiz.
+          </div>
+        )}
         <button
-          onClick={() => setStarted(true)}
+          onClick={() => {
+            console.log('🖱️ Start Practice Quiz button clicked');
+            startQuiz();
+          }}
+          disabled={loading}
           style={{
-            backgroundColor: '#3b82f6',
+            backgroundColor: loading ? '#94a3b8' : '#3b82f6',
             color: 'white',
             border: 'none',
-            padding: '12px 24px',
+            padding: '12px 32px',
             borderRadius: 8,
             fontSize: 16,
             fontWeight: '600',
-            cursor: 'pointer'
+            cursor: loading ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseOver={(e) => {
+            if (!loading) e.target.style.backgroundColor = '#2563eb';
+          }}
+          onMouseOut={(e) => {
+            if (!loading) e.target.style.backgroundColor = '#3b82f6';
           }}
         >
-          Start Scenario
+          {loading ? 'Loading...' : 'Start Practice Quiz'}
         </button>
       </div>
     );
   }
 
-  const step = scenario.steps[currentStep];
+  // 已提交 - 显示结果
+  if (submitted && result) {
+    const passed = result.passed;
+    const scorePercent = Math.round(result.score * 100);
+    
+    return (
+      <div style={{ padding: 40, maxWidth: 800, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ 
+            fontSize: '64px', 
+            marginBottom: 16,
+            animation: 'fadeInUp 0.5s ease-out'
+          }}>
+            {passed ? '🎉' : '📚'}
+          </div>
+          <h2 style={{ marginBottom: 8 }}>
+            {passed ? 'Great Job!' : 'Keep Practicing!'}
+          </h2>
+          <p style={{ color: '#64748b', fontSize: 14 }}>
+            You answered {result.correct_count} out of {result.total_questions} questions correctly
+          </p>
+        </div>
+
+        <div style={{
+          padding: 24,
+          backgroundColor: passed ? '#f0fdf4' : '#fef3c7',
+          border: `2px solid ${passed ? '#86efac' : '#fcd34d'}`,
+          borderRadius: 12,
+          marginBottom: 24
+        }}>
+          <div style={{ 
+            fontSize: 48, 
+            fontWeight: 'bold', 
+            color: passed ? '#16a34a' : '#d97706',
+            textAlign: 'center',
+            marginBottom: 8
+          }}>
+            {scorePercent}%
+          </div>
+          <div style={{ textAlign: 'center', color: '#64748b', fontSize: 14 }}>
+            {passed ? 
+              `You passed! (Threshold: ${Math.round((result.pass_threshold || 0) * 100)}%)` : 
+              `Pass threshold: ${Math.round((result.pass_threshold || 0) * 100)}%`
+            }
+          </div>
+        </div>
+
+        {result.best_score !== null && result.attempt_count > 1 && (
+          <div style={{ 
+            padding: 16, 
+            backgroundColor: '#f1f5f9', 
+            borderRadius: 8,
+            marginBottom: 24,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 13, color: '#64748b' }}>
+              Best Score: {Math.round(result.best_score * 100)}% 
+              {' · '}
+              Attempt #{result.attempt_count}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button
+            onClick={resetQuiz}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: 'white',
+              color: '#3b82f6',
+              border: '2px solid #3b82f6',
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.backgroundColor = '#eff6ff';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = 'white';
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 答题中
+  if (questions.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center' }}>
+        <p style={{ color: '#64748b' }}>No practice questions available for this topic yet.</p>
+        <button
+          onClick={resetQuiz}
+          style={{
+            marginTop: 16,
+            padding: '8px 16px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer'
+          }}
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const currentAnswer = answers[currentQuestion.item_id];
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  const allAnswered = questions.every(q => answers[q.item_id] !== undefined);
 
   return (
     <div style={{ padding: 40, maxWidth: 800, margin: '0 auto' }}>
+      {/* Progress */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, color: '#6b7280' }}>
-          Step {currentStep + 1} of {scenario.steps.length}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: 8
+        }}>
+          <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>
+            {Object.keys(answers).length} / {questions.length} answered
+          </div>
         </div>
-        <h2>{scenario.title}</h2>
+        <div style={{ 
+          width: '100%', 
+          height: 6, 
+          backgroundColor: '#e2e8f0', 
+          borderRadius: 3,
+          overflow: 'hidden'
+        }}>
+          <div style={{ 
+            width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`,
+            height: '100%',
+            backgroundColor: '#3b82f6',
+            transition: 'width 0.3s ease'
+          }} />
+        </div>
       </div>
 
+      {/* Question */}
       <div style={{ 
         padding: 24, 
-        backgroundColor: '#f8f9fa', 
+        backgroundColor: '#f8fafc', 
         borderRadius: 12, 
-        marginBottom: 24 
+        marginBottom: 24,
+        border: '1px solid #e2e8f0'
       }}>
-        <p style={{ fontSize: 16, lineHeight: 1.6 }}>{step.situation}</p>
+        <div style={{ 
+          fontSize: 12, 
+          color: '#64748b', 
+          marginBottom: 8,
+          textTransform: 'uppercase',
+          fontWeight: 600
+        }}>
+          {currentQuestion.qtype === 'single' ? 'Single Choice' : 
+           currentQuestion.qtype === 'multi' ? 'Multiple Choice' : 'Short Answer'}
+        </div>
+        <p style={{ fontSize: 16, lineHeight: 1.6, margin: 0, color: '#1e293b' }}>
+          {currentQuestion.stem}
+        </p>
       </div>
 
+      {/* Answer Options */}
       <div style={{ marginBottom: 24 }}>
-        <h3>What would you do?</h3>
-        {step.options.map((option, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setDecisions([...decisions, option]);
-              if (currentStep < scenario.steps.length - 1) {
-                setCurrentStep(currentStep + 1);
-              }
-            }}
+        {currentQuestion.qtype === 'single' && currentQuestion.choices && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {currentQuestion.choices.map((choice) => {
+              const isSelected = currentAnswer === choice.id;
+              return (
+                <button
+                  key={choice.id}
+                  onClick={() => handleAnswer(currentQuestion.item_id, choice.id)}
+                  style={{
+                    padding: 16,
+                    backgroundColor: isSelected ? '#eff6ff' : 'white',
+                    border: `2px solid ${isSelected ? '#3b82f6' : '#e2e8f0'}`,
+                    borderRadius: 8,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12
+                  }}
+                  onMouseOver={(e) => {
+                    if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isSelected) e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                >
+                  <div style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    border: `2px solid ${isSelected ? '#3b82f6' : '#cbd5e1'}`,
+                    backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {isSelected && (
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: 'white'
+                      }} />
+                    )}
+                  </div>
+                  <span style={{ color: '#1e293b' }}>{choice.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {currentQuestion.qtype === 'multi' && currentQuestion.choices && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {currentQuestion.choices.map((choice) => {
+              const selectedOptions = currentAnswer ? currentAnswer.split(',') : [];
+              const isSelected = selectedOptions.includes(choice.id);
+              return (
+                <button
+                  key={choice.id}
+                  onClick={() => {
+                    const current = currentAnswer ? currentAnswer.split(',') : [];
+                    const updated = isSelected
+                      ? current.filter(id => id !== choice.id)
+                      : [...current, choice.id];
+                    handleAnswer(currentQuestion.item_id, updated.sort().join(','));
+                  }}
+                  style={{
+                    padding: 16,
+                    backgroundColor: isSelected ? '#eff6ff' : 'white',
+                    border: `2px solid ${isSelected ? '#3b82f6' : '#e2e8f0'}`,
+                    borderRadius: 8,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12
+                  }}
+                >
+                  <div style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    border: `2px solid ${isSelected ? '#3b82f6' : '#cbd5e1'}`,
+                    backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {isSelected && (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M10 3L4.5 8.5L2 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span style={{ color: '#1e293b' }}>{choice.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {currentQuestion.qtype === 'short' && (
+          <textarea
+            value={currentAnswer || ''}
+            onChange={(e) => handleAnswer(currentQuestion.item_id, e.target.value)}
+            placeholder="Type your answer here..."
             style={{
-              display: 'block',
               width: '100%',
+              minHeight: 120,
               padding: 16,
-              marginBottom: 12,
-              backgroundColor: 'white',
-              border: '2px solid #e5e7eb',
+              border: '2px solid #e2e8f0',
               borderRadius: 8,
-              textAlign: 'left',
-              cursor: 'pointer',
               fontSize: 14,
-              transition: 'border-color 0.2s'
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              boxSizing: 'border-box'
             }}
-            onMouseOver={(e) => e.target.style.borderColor = '#3b82f6'}
-            onMouseOut={(e) => e.target.style.borderColor = '#e5e7eb'}
-          >
-            {option}
-          </button>
-        ))}
+          />
+        )}
       </div>
+
+      {/* Navigation */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        paddingTop: 24,
+        borderTop: '1px solid #e2e8f0'
+      }}>
+        <button
+          onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+          disabled={currentQuestionIndex === 0}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: 'white',
+            color: currentQuestionIndex === 0 ? '#cbd5e1' : '#64748b',
+            border: '1px solid #e2e8f0',
+            borderRadius: 6,
+            fontSize: 14,
+            fontWeight: '500',
+            cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer'
+          }}
+        >
+          ← Previous
+        </button>
+
+        {!isLastQuestion ? (
+          <button
+            onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
+          >
+            Next →
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={!allAnswered || loading}
+            style={{
+              padding: '10px 24px',
+              backgroundColor: !allAnswered || loading ? '#cbd5e1' : '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: '600',
+              cursor: !allAnswered || loading ? 'not-allowed' : 'pointer'
+            }}
+            onMouseOver={(e) => {
+              if (allAnswered && !loading) e.target.style.backgroundColor = '#059669';
+            }}
+            onMouseOut={(e) => {
+              if (allAnswered && !loading) e.target.style.backgroundColor = '#10b981';
+            }}
+          >
+            {loading ? 'Submitting...' : 'Submit Quiz'}
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div style={{
+          marginTop: 16,
+          padding: 12,
+          backgroundColor: '#fee2e2',
+          color: '#991b1b',
+          borderRadius: 6,
+          fontSize: 13
+        }}>
+          {error}
+        </div>
+      )}
     </div>
   );
 }
