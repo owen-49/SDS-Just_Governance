@@ -33,12 +33,20 @@ const GlobalAssessment = () => {
         difficulty,
         count: questionCount
       });
+      const payload = response?.items ? response : response?.data ?? response ?? {};
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      const progressPayload = payload?.progress ?? {
+        total: items.length,
+        answered: 0,
+        last_question_index: 0
+      };
       
-      setSessionId(response.session_id);
-      setQuestions(response.items || []);
-      setProgress(response.progress || { total: response.items?.length || 0, answered: 0, last_question_index: 0 });
+      setSessionId(payload?.session_id || null);
+      setQuestions(items);
+      setProgress(progressPayload);
+      
       setStage('taking');
-      setCurrentIndex(0);
+      setCurrentIndex(Math.min(progressPayload.last_question_index ?? 0, Math.max(items.length - 1, 0)));
     } catch (err) {
       console.error('Failed to start assessment:', err);
       
@@ -102,7 +110,8 @@ const GlobalAssessment = () => {
     
     try {
       const response = await assessmentApi.submitAssessment(sessionId, force || unansweredCount > 0);
-      setResult(response);
+      const payload = response?.session_id ? response : response?.data ?? response ?? {};
+      setResult(payload);
       setStage('result');
     } catch (err) {
       console.error('Failed to submit assessment:', err);
@@ -471,13 +480,15 @@ const GlobalAssessment = () => {
   // Result stage
   if (stage === 'result' && result) {
     const { total_score, ai_summary, ai_recommendation } = result;
+    const numericScore = Number(total_score ?? 0);
+    const scoreDisplay = Number.isFinite(numericScore) ? Math.round(numericScore) : 0;
 
     return (
       <DocumentLayout title="Assessment Results" lastUpdated="October 18, 2025">
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', padding: '48px', borderRadius: '16px', textAlign: 'center', marginBottom: '32px', boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2)' }}>
             <h1 style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '8px' }}>
-              {Math.round(total_score)}%
+              {scoreDisplay}%
             </h1>
             <p style={{ fontSize: '20px', opacity: 0.95 }}>Your Assessment Score</p>
           </div>

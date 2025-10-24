@@ -13,9 +13,18 @@ const AssessmentHistory = () => {
   const navigate = useNavigate();
   
   const [assessments, setAssessments] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, has_next: false });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, total_pages: 0, has_next: false });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const lastUpdatedLabel = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const totalPagesDisplay =
+    pagination.total_pages ||
+    Math.ceil((pagination.total || 0) / (pagination.limit || 1)) ||
+    1;
 
   useEffect(() => {
     loadHistory(pagination.page);
@@ -27,8 +36,22 @@ const AssessmentHistory = () => {
     
     try {
       const response = await assessmentApi.getAssessmentHistory(page, pagination.limit);
-      setAssessments(response.items || []);
-      setPagination(response.pagination || { page, limit: pagination.limit, total: 0, has_next: false });
+      const items = response?.items || [];
+      const rawPagination = response?.pagination || {};
+      const currentPage = rawPagination.page ?? page;
+      const currentLimit = rawPagination.limit ?? pagination.limit;
+      const totalItems = rawPagination.total ?? items.length;
+      const totalPages = rawPagination.total_pages ?? Math.max(1, Math.ceil(totalItems / currentLimit));
+      const hasNext = rawPagination.has_next ?? currentPage < totalPages;
+
+      setAssessments(items);
+      setPagination({
+        page: currentPage,
+        limit: currentLimit,
+        total: totalItems,
+        total_pages: totalPages,
+        has_next: hasNext,
+      });
     } catch (err) {
       console.error('Failed to load history:', err);
       setError(getErrorMessage(err));
@@ -85,7 +108,7 @@ const AssessmentHistory = () => {
 
   if (isLoading && assessments.length === 0) {
     return (
-      <DocumentLayout title="Assessment History" lastUpdated="October 18, 2025">
+      <DocumentLayout title="Assessment History" lastUpdated={lastUpdatedLabel}>
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
           <p style={{ fontSize: '18px', color: '#6b7280' }}>Loading your assessment history...</p>
@@ -95,7 +118,7 @@ const AssessmentHistory = () => {
   }
 
   return (
-    <DocumentLayout title="Assessment History" lastUpdated="October 18, 2025">
+    <DocumentLayout title="Assessment History" lastUpdated={lastUpdatedLabel}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '40px', borderRadius: '16px', marginBottom: '32px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
@@ -265,7 +288,7 @@ const AssessmentHistory = () => {
                 </button>
                 
                 <span style={{ color: '#6b7280', fontSize: '14px' }}>
-                  Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}
+                  Page {pagination.page} of {totalPagesDisplay}
                 </span>
                 
                 <button

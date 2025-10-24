@@ -64,60 +64,52 @@ class AssessmentService:
     async def start_global_assessment(
         self, *, user_id: UUID, config: Optional[AssessmentStartIn] = None
     ) -> AssessmentStartOut:
-        """
-        开始整体评测
-
-        业务逻辑：
-        1. 检查用户是否有未提交的 global 会话（可选约束）
-        2. 创建 assessment_sessions(kind='global', user_id=...)
-        3. 从 questions 表跨主题抽题（按权重/难度策略）
-        4. 写入 assessment_items(question_snapshot)
-        5. 返回首屏题目（前端可分页加载或一次性全拿）
-
-        Args:
-            user_id: 用户ID
-            config: 可选配置（难度、题数）
-
-        Returns:
-            AssessmentStartOut 对象
-
-        Raises:
-            BizError(409): 用户已有未提交的global会话
-
-        Example:
-            >>> assessment_service = AssessmentService(db)
-            >>> result = await assessment_service.start_global_assessment(
-            ...     user_id=user_id,
-            ...     config=AssessmentStartIn(difficulty="mixed", count=20)
-            ... )
-        """
-        # 1. 检查是否有未完成的会话（可选约束）
+        """Start or resume a global assessment for the user."""
         existing = await sessions_repo.get_latest_unsubmitted_session(
             self.db, user_id=user_id, kind="global"
         )
 
         if existing:
-            raise BizError(
-                409,
-                BizCode.CONFLICT,
-                "unfinished_assessment_exists",
-                data={
-                    "session_id": str(existing.id),
-                    "started_at": existing.started_at.isoformat(),
-                    "message": "请先完成或删除现有评测",
-                },
+            existing_items = await items_repo.get_session_items(
+                self.db, session_id=existing.id, order_by_no=True
             )
 
-        # 2. 解析配置
+            if existing_items:
+                answered = await responses_repo.count_session_responses(
+                    self.db, session_id=existing.id
+                )
+                last_index = existing.last_question_index or answered
+
+                logger.info(
+                    "Resuming unfinished global assessment session %s for user %s",
+                    existing.id,
+                    user_id,
+                )
+
+                progress = AssessmentProgress(
+                    total=len(existing_items),
+                    answered=answered,
+                    last_question_index=last_index,
+                )
+
+                return self._build_start_out(
+                    session=existing, items=existing_items, progress=progress
+                )
+
+            logger.warning(
+                "Found unfinished global assessment session %s without items; removing stale session",
+                existing.id,
+            )
+            await self.db.delete(existing)
+            await self.db.flush()
+
         difficulty = config.difficulty if config else "mixed"
         count = config.count if config else 20
 
-        # 3. 创建评测会话
         session = await sessions_repo.create_session(
             self.db, user_id=user_id, kind="global", last_question_index=0
         )
 
-        # 4. 抽题（跨主题，按难度分布）
         questions = await self._select_questions_for_global(
             difficulty=difficulty, count=count
         )
@@ -130,18 +122,16 @@ class AssessmentService:
                 data={
                     "required": count,
                     "actual": len(questions),
-                    "message": f"题库仅有 {len(questions)} 题，需要 {count} 题",
+                    "message": f"Only {len(questions)} questions available; requested {count}.",
                 },
             )
 
-        # 5. 写入 assessment_items（题目快照）
         items = await items_repo.create_items_batch(
             self.db, session_id=session.id, questions=questions
         )
 
         await self.db.commit()
 
-        # 6. 构建响应
         return self._build_start_out(session=session, items=items)
 
     async def _select_questions_for_global(self, difficulty: str, count: int) -> List:
@@ -168,17 +158,14 @@ class AssessmentService:
 
         return questions
 
-    def _build_start_out(self, *, session, items: List) -> AssessmentStartOut:
-        """
-        构建开始评测响应
-
-        Args:
-            session: 评测会话对象
-            items: 题目实例列表
-
-        Returns:
-            AssessmentStartOut 对象
-        """
+    def _build_start_out(
+        self,
+        *,
+        session,
+        items: List,
+        progress: AssessmentProgress | None = None,
+    ) -> AssessmentStartOut:
+        """Build the DTO returned by the start endpoint."""
         question_bases = []
         for item in items:
             snapshot = item.question_snapshot
@@ -194,15 +181,17 @@ class AssessmentService:
                 )
             )
 
-        progress = AssessmentProgress(
-            total=len(items), answered=0, last_question_index=0
+        computed_progress = progress or AssessmentProgress(
+            total=len(items),
+            answered=0,
+            last_question_index=0,
         )
 
         return AssessmentStartOut(
             session_id=session.id,
             started_at=session.started_at,
             items=question_bases,
-            progress=progress,
+            progress=computed_progress,
         )
 
     # ========================================
