@@ -162,6 +162,16 @@ class AssessmentStartOut(BaseModel):
     progress: AssessmentProgress
 
 
+class AssessmentAvailabilityOut(BaseModel):
+    """
+    全局测评的题量概览信息
+    """
+
+    available_total: int = Field(..., ge=0, description="当前题库中可用的题目总数（仅激活题目）")
+    default_count: int = Field(..., ge=0, description="建议默认采用的题量（受题库限制）")
+    max_count: int = Field(..., ge=0, description="允许选择的最大题量（不会超过题库数量与业务上限）")
+
+
 # ========================================
 # 四、整体评测 - 答题过程
 # ========================================

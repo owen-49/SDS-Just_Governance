@@ -21,6 +21,7 @@ from app.core.exceptions.exceptions import BizError, BizCode
 from app.schemas.assessment import (
     AssessmentStartIn,
     AssessmentStartOut,
+    AssessmentAvailabilityOut,
     AssessmentProgress,
     AnswerSaveIn,
     AnswerSaveOut,
@@ -57,6 +58,18 @@ class AssessmentService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def get_global_availability(self) -> AssessmentAvailabilityOut:
+        """Return availability metadata for global assessments."""
+        total_available = await questions_repo.count_total_questions(self.db)
+        max_count = min(50, total_available) if total_available else 0
+        default_count = min(20, max_count) if max_count else 0
+
+        return AssessmentAvailabilityOut(
+            available_total=total_available,
+            default_count=default_count,
+            max_count=max_count,
+        )
+
     # ========================================
     # 一、开始整体评测（创建会话+出题）
     # ========================================
@@ -68,6 +81,33 @@ class AssessmentService:
         existing = await sessions_repo.get_latest_unsubmitted_session(
             self.db, user_id=user_id, kind="global"
         )
+
+        requested_count = config.count if (config and config.count) else 20
+        total_available = await questions_repo.count_total_questions(self.db)
+
+        if not existing:
+            if total_available <= 0:
+                raise BizError(
+                    400,
+                    BizCode.INVALID_REQUEST,
+                    "insufficient_questions",
+                    data={
+                        "required": requested_count,
+                        "actual": total_available,
+                        "message": "No active questions are available. Please add questions before starting the assessment.",
+                    },
+                )
+            if requested_count > total_available:
+                raise BizError(
+                    400,
+                    BizCode.INVALID_REQUEST,
+                    "insufficient_questions",
+                    data={
+                        "required": requested_count,
+                        "actual": total_available,
+                        "message": f"Only {total_available} questions available; requested {requested_count}.",
+                    },
+                )
 
         if existing:
             existing_items = await items_repo.get_session_items(
@@ -104,7 +144,7 @@ class AssessmentService:
             await self.db.flush()
 
         difficulty = config.difficulty if config else "mixed"
-        count = config.count if config else 20
+        count = requested_count
 
         session = await sessions_repo.create_session(
             self.db, user_id=user_id, kind="global", last_question_index=0

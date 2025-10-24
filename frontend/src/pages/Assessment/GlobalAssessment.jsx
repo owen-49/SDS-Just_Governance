@@ -4,7 +4,7 @@
  * Comprehensive governance knowledge assessment with AI-powered recommendations
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DocumentLayout } from '../../components/layout';
 import { assessmentApi, getErrorMessage } from '../../services/assessmentApi';
 
@@ -21,13 +21,64 @@ const GlobalAssessment = () => {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [difficulty, setDifficulty] = useState('mixed');
-  const [questionCount, setQuestionCount] = useState(20);
+  const [questionCount, setQuestionCount] = useState(5);
+  const [availableQuestions, setAvailableQuestions] = useState(null);
+  const [minQuestions, setMinQuestions] = useState(5);
+  const [maxQuestions, setMaxQuestions] = useState(50);
+  const lastUpdatedLabel = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      try {
+        const availability = await assessmentApi.getGlobalAvailability();
+        const total = availability?.available_total ?? 0;
+        const maxCountRaw = availability?.max_count ?? total ?? 0;
+        const safeMax = Math.max(1, Math.min(maxCountRaw, 50));
+        const safeMin = Math.max(1, Math.min(5, safeMax));
+        const defaultCount = availability?.default_count ?? Math.min(20, safeMax);
+
+        setAvailableQuestions(total);
+        setMaxQuestions(safeMax);
+        setMinQuestions(safeMin);
+        setQuestionCount((prev) => {
+          const desired = defaultCount || prev || safeMin;
+          return Math.min(Math.max(desired, safeMin), safeMax);
+        });
+      } catch (err) {
+        console.error('Failed to load assessment availability:', err);
+      }
+    };
+
+    fetchAvailability();
+  }, []);
 
   // Start assessment
   const handleStart = async () => {
     setError('');
     setIsLoading(true);
-    
+
+    if (questionCount > maxQuestions) {
+      setError(`Only ${maxQuestions} questions are currently available. Please select ${maxQuestions} or fewer.`);
+      setIsLoading(false);
+      return;
+    }
+
+    if (questionCount < minQuestions) {
+      setError(`Please choose at least ${minQuestions} question${minQuestions === 1 ? '' : 's'}.`);
+      setIsLoading(false);
+      return;
+    }
+
+    if (availableQuestions !== null && availableQuestions === 0) {
+      setError('No active questions are available. Please add questions before starting the assessment.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await assessmentApi.startGlobalAssessment({
         difficulty,
@@ -269,7 +320,7 @@ const GlobalAssessment = () => {
   // Intro stage
   if (stage === 'intro') {
     return (
-      <DocumentLayout title="Global Governance Assessment" lastUpdated="October 18, 2025">
+      <DocumentLayout title="Global Governance Assessment" lastUpdated={lastUpdatedLabel}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '40px', borderRadius: '16px', marginBottom: '32px' }}>
             <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '16px' }}>
@@ -303,17 +354,27 @@ const GlobalAssessment = () => {
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
                 Number of Questions: {questionCount}
               </label>
+              {availableQuestions !== null && (
+                <p style={{ marginTop: 0, marginBottom: '8px', color: '#6b7280', fontSize: '14px' }}>
+                  Available questions: {availableQuestions}
+                </p>
+              )}
               <input
                 type="range"
-                min="5"
-                max="50"
+                min={minQuestions}
+                max={maxQuestions}
                 value={questionCount}
-                onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10);
+                  if (Number.isNaN(value)) return;
+                  setQuestionCount(Math.min(Math.max(value, minQuestions), maxQuestions));
+                }}
                 style={{ width: '100%' }}
+                disabled={maxQuestions <= minQuestions}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#6b7280' }}>
-                <span>5 questions</span>
-                <span>50 questions</span>
+                <span>{minQuestions} question{minQuestions === 1 ? '' : 's'}</span>
+                <span>{maxQuestions} question{maxQuestions === 1 ? '' : 's'}</span>
               </div>
             </div>
 
@@ -325,17 +386,19 @@ const GlobalAssessment = () => {
 
             <button
               onClick={handleStart}
-              disabled={isLoading}
+              disabled={isLoading || (availableQuestions !== null && availableQuestions === 0)}
               style={{
                 width: '100%',
                 padding: '16px',
-                background: isLoading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                background: (isLoading || (availableQuestions !== null && availableQuestions === 0))
+                  ? '#9ca3af'
+                  : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontSize: '18px',
                 fontWeight: '600',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
+                cursor: (isLoading || (availableQuestions !== null && availableQuestions === 0)) ? 'not-allowed' : 'pointer',
                 boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
               }}
             >
@@ -363,7 +426,7 @@ const GlobalAssessment = () => {
     const progressPercent = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
     return (
-      <DocumentLayout title="Taking Assessment" lastUpdated="October 18, 2025">
+      <DocumentLayout title="Taking Assessment" lastUpdated={lastUpdatedLabel}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)', marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -484,7 +547,7 @@ const GlobalAssessment = () => {
     const scoreDisplay = Number.isFinite(numericScore) ? Math.round(numericScore) : 0;
 
     return (
-      <DocumentLayout title="Assessment Results" lastUpdated="October 18, 2025">
+      <DocumentLayout title="Assessment Results" lastUpdated={lastUpdatedLabel}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', padding: '48px', borderRadius: '16px', textAlign: 'center', marginBottom: '32px', boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2)' }}>
             <h1 style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '8px' }}>

@@ -24,6 +24,7 @@ from app.schemas.assessment import (
     QuizSubmitOut,
     AssessmentStartIn,
     AssessmentStartOut,
+    AssessmentAvailabilityOut,
     AnswerSaveIn,
     AnswerSaveOut,
     AssessmentSubmitOut,
@@ -196,6 +197,56 @@ async def submit_topic_quiz(
 # ========================================
 # 二、整体评测（Global Assessment）
 # ========================================
+
+@router.get(
+    "/assessments/global/availability",
+    response_model=ApiResponse[AssessmentAvailabilityOut],
+    summary="Get global assessment availability metadata",
+)
+async def get_global_assessment_availability(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return availability info so the client can cap question counts."""
+    request_id = (
+        request.state.request_id if hasattr(request.state, "request_id") else None
+    )
+
+    try:
+        assessment_service = AssessmentService(db)
+
+        result = await assessment_service.get_global_availability()
+
+        logger.info(
+            {
+                "action": "availability_retrieved",
+                "request_id": request_id,
+                "user_id": str(current_user.id),
+                "available_total": result.available_total,
+                "max_count": result.max_count,
+            }
+        )
+
+        return ok(data=result.model_dump(), request_id=request_id)
+
+    except Exception as e:
+        logger.error(
+            {
+                "action": "availability_error",
+                "request_id": request_id,
+                "user_id": str(current_user.id),
+                "error": str(e),
+            },
+            exc_info=True,
+        )
+        return fail(
+            code=BizCode.INTERNAL_ERROR,
+            message="internal_error",
+            request_id=request_id,
+        )
+
+
 
 
 @router.post(

@@ -62,6 +62,15 @@ export const assessmentApi = {
   },
 
   /**
+   * Fetch availability metadata for the global assessment.
+   * @returns {Promise<{available_total:number, default_count:number, max_count:number}>}
+   */
+  async getGlobalAvailability() {
+    const response = await request(`${BASE_URL}/assessments/global/availability`);
+    return response?.data ?? response;
+  },
+
+  /**
    * Save answer for a single question (auto-save)
    * @param {string} sessionId - Assessment session UUID
    * @param {string} itemId - Question item UUID
