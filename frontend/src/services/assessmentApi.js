@@ -99,10 +99,10 @@ export const assessmentApi = {
    * @param {number} page - Page number
    * @param {number} limit - Items per page
    * @returns {Promise} List of past assessments
-   */
+  */
   async getAssessmentHistory(page = 1, limit = 10) {
     const response = await request(`${BASE_URL}/assessments/history?page=${page}&limit=${limit}`);
-    return response;
+    return response?.data ?? response;
   },
 
   /**
@@ -112,7 +112,7 @@ export const assessmentApi = {
    */
   async getAssessmentDetail(sessionId) {
     const response = await request(`${BASE_URL}/assessments/${sessionId}`);
-    return response;
+    return response?.data ?? response;
   }
 };
 
