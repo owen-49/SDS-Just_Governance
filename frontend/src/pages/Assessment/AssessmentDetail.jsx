@@ -4,7 +4,7 @@
  * View detailed results with all questions and answers
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DocumentLayout } from '../../components/layout';
 import { assessmentApi, getErrorMessage } from '../../services/assessmentApi';
@@ -16,6 +16,28 @@ const AssessmentDetail = () => {
   const [detail, setDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const lastUpdatedLabel = useMemo(() => {
+    if (!detail?.session?.submitted_at) {
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+    try {
+      return new Date(detail.session.submitted_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+  }, [detail?.session?.submitted_at]);
 
   useEffect(() => {
     loadDetail();
@@ -158,7 +180,7 @@ const AssessmentDetail = () => {
 
   if (isLoading) {
     return (
-      <DocumentLayout title="Loading Results..." lastUpdated="October 18, 2025">
+      <DocumentLayout title="Loading Results..." lastUpdated={lastUpdatedLabel}>
         <div style={{ textAlign: 'center', padding: '60px' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
           <p style={{ fontSize: '18px', color: '#6b7280' }}>Loading assessment details...</p>
@@ -169,7 +191,7 @@ const AssessmentDetail = () => {
 
   if (error || !detail) {
     return (
-      <DocumentLayout title="Error" lastUpdated="October 18, 2025">
+      <DocumentLayout title="Error" lastUpdated={lastUpdatedLabel}>
         <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', padding: '60px' }}>
           <div style={{ fontSize: '64px', marginBottom: '24px' }}>❌</div>
           <h2 style={{ marginBottom: '16px', color: '#dc2626' }}>Failed to Load Details</h2>
@@ -199,7 +221,7 @@ const AssessmentDetail = () => {
   const totalCount = items_with_responses?.length || 0;
 
   return (
-    <DocumentLayout title="Assessment Details" lastUpdated="October 18, 2025">
+    <DocumentLayout title="Assessment Details" lastUpdated={lastUpdatedLabel}>
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '40px', borderRadius: '16px', marginBottom: '32px' }}>
