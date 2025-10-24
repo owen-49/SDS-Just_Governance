@@ -65,6 +65,16 @@ const QuestionManager = () => {
       return;
     }
 
+    if (formData.qtype === 'single' && formData.correct_options.length !== 1) {
+      setError('Single choice questions must have exactly one correct answer');
+      return;
+    }
+
+    if (formData.qtype === 'multi' && formData.correct_options.length < 2) {
+      setError('Multiple choice questions require at least two correct answers');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
