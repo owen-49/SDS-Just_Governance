@@ -33,43 +33,58 @@ def limit_by_ip(scope: str, limit: int, window_seconds: int):
         key = f"rl:{scope}:ip:{get_client_ip(request)}"
         window_ms = window_seconds * 1000
 
+        # Phase 1: trim + count
         pipe = redis.pipeline(transaction=True)
-        # 1）移除过期记录：即加入集合的时间 + 窗口时长 < 当前时间的元素
         await pipe.zremrangebyscore(key, 0, now_ms - window_ms)
-        # 2）记录当前请求时间（zadd）
-        await pipe.zadd(key, {str(now_ms): now_ms})
-        # 3）为整个有序集合设置新的过期时间
-        await pipe.expire(key, window_seconds)
-        # 4）统计当前窗口的访问次数
         await pipe.zcard(key)
-        _, _, _, count = await pipe.execute()
+        _, count = await pipe.execute()
 
-        if count > limit:
-            ttl = await redis.ttl(key)
-            raise BizError(
-                429, BizCode.TOO_MANY_REQUESTS, "too_many_requests",
-                data={"scope": scope, "limit": limit, "window_s": window_seconds},
-                headers={"Retry-After": str(max(ttl, 1))}
-            )
+        if count >= limit:
+            # compute real retry-after from oldest in-window item
+            oldest = await redis.zrange(key, 0, 0, withscores=True)
+            oldest_ms = int(oldest[0][1]) if oldest else now_ms
+            retry_sec = max(1, (oldest_ms + window_ms - now_ms + 999) // 1000)
+            raise BizError(429, BizCode.RATE_LIMITED, "rate_limited",
+                           headers={"Retry-After": str(retry_sec)})
+
+        # Phase 2: record + expire (only on accepted requests)
+        pipe = redis.pipeline(transaction=True)
+        await pipe.zadd(key, {str(now_ms): now_ms})
+        await pipe.pexpire(key, window_ms)
+        await pipe.execute()
     return _dep
+
 
 # ---- 针对“某个值”的限流（email/手机号/用户ID等），在业务代码里调用 ----
 async def limit_by_value(redis: Redis, scope: str, value: str, limit: int, window_seconds: int):
     now_ms = int(time.time() * 1000)
-    key = f"rl:{scope}:key:{value}"
     window_ms = window_seconds * 1000
+    key = f"rl:{scope}:key:{value}"
 
-    pipe = redis.pipeline()
+    # Phase 1: trim + count (no side effects if we later reject)
+    pipe = redis.pipeline(transaction=True)
     await pipe.zremrangebyscore(key, 0, now_ms - window_ms)
-    await pipe.zadd(key, {str(now_ms): now_ms})
-    await pipe.expire(key, window_seconds)
     await pipe.zcard(key)
-    _, _, _, count = await pipe.execute()
+    _, count = await pipe.execute()
 
-    if count > limit:
-        ttl = await redis.ttl(key)
+    if count >= limit:
+        # Compute precise retry time from the oldest member still in the window
+        oldest = await redis.zrange(key, 0, 0, withscores=True)
+        if oldest:
+            oldest_ms = int(oldest[0][1])
+            retry_ms = oldest_ms + window_ms - now_ms
+        else:
+            retry_ms = window_ms  # fallback
+        retry_sec = max(1, (retry_ms + 999) // 1000)
+
         raise BizError(
-            429, BizCode.TOO_MANY_REQUESTS, "too_many_requests",
+            429, BizCode.RATE_LIMITED, "rate_limited",
             data={"scope": scope, "limit": limit, "window_s": window_seconds, "value": value},
-            headers={"Retry-After": str(max(ttl, 1))}
+            headers={"Retry-After": str(retry_sec)}
         )
+
+    # Phase 2: record + housekeeping (only for accepted requests)
+    pipe = redis.pipeline(transaction=True)
+    await pipe.zadd(key, {str(now_ms): now_ms})
+    await pipe.pexpire(key, window_ms)  # refresh for cleanup only on success
+    await pipe.execute()
