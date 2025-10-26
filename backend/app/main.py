@@ -15,7 +15,7 @@ from app.core.exceptions.exceptions import setup_exception_handlers
 from app.core.logging.logging_config import setup_logging
 from app.middleware.access_log import AccessLogMiddleware
 from app.middleware.request_id import RequestIDMiddleware
-from core.redis.redis_client import create_redis
+from app.core.redis.redis_client import create_redis
 
 
 # @asynccontextmanager

@@ -5,7 +5,7 @@ from fastapi import Request, Depends
 from redis.asyncio import Redis
 from app.core.exceptions.exceptions import BizError
 from app.core.exceptions.codes import BizCode
-from core.redis.redis_dep import get_redis
+from app.core.redis.redis_dep import get_redis
 
 
 def get_client_ip(request: Request) -> str:

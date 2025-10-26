@@ -26,9 +26,8 @@ from app.deps.auth import get_current_user
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from core.redis.redis_client import get_redis_from_app
-from core.redis.redis_dep import get_redis
-from deps.rate_limit import limit_by_ip, limit_by_value
+from app.core.redis.redis_dep import get_redis
+from app.deps.rate_limit import limit_by_ip, limit_by_value
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
