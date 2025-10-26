@@ -15,20 +15,46 @@ from app.core.exceptions.exceptions import setup_exception_handlers
 from app.core.logging.logging_config import setup_logging
 from app.middleware.access_log import AccessLogMiddleware
 from app.middleware.request_id import RequestIDMiddleware
+from core.redis.redis_client import create_redis
 
+
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     # ---- startup ----
+#     setup_logging(fmt="pretty")
+#     logging.getLogger(__name__).info("logging configured (lifespan)")
+#     try:
+#         yield
+#     finally:
+#         # ---- shutdown ----
+#         # 在此处做资源清理，如关闭会话、连接池等
+#         logging.getLogger(__name__).info("shutdown complete")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ---- startup ----
+    # ---------- startup ----------
     setup_logging(fmt="pretty")
     logging.getLogger(__name__).info("logging configured (lifespan)")
+
+    app.state.redis = await create_redis()
+    try:
+        # 可选：健康检查
+        await app.state.redis.ping()
+        logging.getLogger(__name__).info("redis connected")
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"redis ping failed: {e}")
+
     try:
         yield
     finally:
-        # ---- shutdown ----
-        # 在此处做资源清理，如关闭会话、连接池等
-        logging.getLogger(__name__).info("shutdown complete")
+        # ---------- shutdown ----------
+        try:
+            await app.state.redis.close()
+            logging.getLogger(__name__).info("redis closed")
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"redis close failed: {e}")
 
+        logging.getLogger(__name__).info("shutdown complete")
 
 app = FastAPI(title="Just Governance API", version="0.1.0", lifespan=lifespan)
 

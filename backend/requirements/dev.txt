@@ -4,8 +4,6 @@
 #
 #    pip-compile --cert=None --client-cert=None --index-url=None --output-file=dev.txt --pip-args=None dev.in
 #
-aiosqlite==0.20.0
-    # via -r base.in
 alembic==1.16.5
     # via -r base.in
 annotated-types==0.7.0
@@ -183,6 +181,8 @@ pywin32==311
     # via jupyter-core
 pyzmq==27.1.0
     # via jupyter-client
+redis==6.4.0
+    # via -r base.in
 referencing==0.36.2
     # via
     #   jsonschema

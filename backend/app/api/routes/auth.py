@@ -25,6 +25,9 @@ from app.deps.auth import get_current_user
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from core.redis.redis_client import get_redis_from_app
+from core.redis.redis_dep import get_redis
+from deps.rate_limit import limit_by_ip
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -145,7 +148,8 @@ async def register(payload: RegisterIn, db: AsyncSession = Depends(get_db)):
         raise e
 
 # 二、登录，成功后返回 access_token并通过 Cookie 设置 refresh_token，并记录登录 session（UserSession）。
-@router.post("/login", response_model=TokenOut)
+@router.post("/login", response_model=TokenOut,
+             dependencies=[Depends(limit_by_ip("register", limit=5, window_seconds=3600))])
 async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
     # 第一步：查询用户
     q = await db.execute(select(User).where(User.email == payload.email))
