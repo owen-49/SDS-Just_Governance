@@ -27,7 +27,7 @@ def _sha256_bytes(s: str) -> bytes:
     return hashlib.sha256(s.encode("utf-8")).digest()
 
 # ----------------- 一、密码存储 ------------------
-# 1) 哈希：先 sha256，再 bcrypt
+# 1) 哈希
 def hash_password(raw: str) -> str:
     """
     先对明文做 SHA-256，再把32字节摘要交给 bcrypt。
@@ -40,10 +40,11 @@ def hash_password(raw: str) -> str:
     hashed = bcrypt.hashpw(digest, salt).decode("utf-8")
     return hashed
 
-# 2) 校验：对输入做同样的 SHA-256，再用 bcrypt.checkpw
+# 2) 校验
 def verify_password(raw: str, hashed: str) -> bool:
     """
-    校验逻辑必须与 hash_password 对称：raw -> sha256 -> bcrypt.checkpw
+    校验密码：
+    拿用户输入的明文密码 raw，先做一遍 SHA-256，然后跟数据库里传过来的哈希 hashed 进行 bcrypt 比对
     """
     if not isinstance(raw, str):
         return False
@@ -87,8 +88,11 @@ def new_refresh_token_pair() -> Tuple[str, str, str]:  # (plain, hash, jti)
     ).hexdigest()
     return token_with_jti, hashed, jti
 
-# 2) 对 refresh token 明文（含 jti）进行哈希（用于校验）
+# 2) 明文哈希
 def hash_refresh_token(token_with_jti: str) -> str:
+    """
+    对 refresh token 明文（含 jti）进行哈希，用于校验
+    """
     return hmac.new(
         REFRESH_HASH_PEPPER.encode("utf-8"),
         token_with_jti.encode("utf-8"),
