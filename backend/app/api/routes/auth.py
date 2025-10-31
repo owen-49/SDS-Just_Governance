@@ -9,6 +9,7 @@ from redis.asyncio import Redis
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.orm import noload
 
 from app.core.db.db import get_db
 from app.core.tools.auth import normalize_email
@@ -349,7 +350,7 @@ async def refresh(
     # 2) 事务 + 行锁：对当前 jti 串行化 refresh
     async with db.begin():
         res = await db.execute(
-            select(UserSession).where(UserSession.jti == jti).with_for_update()
+            select(UserSession).options(noload(UserSession.user)).where(UserSession.jti == jti).with_for_update()
         )
         sess = res.scalar_one_or_none()
 

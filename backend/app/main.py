@@ -59,8 +59,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Just Governance API", version="0.1.0", lifespan=lifespan)
 
 # middlewares
-app.add_middleware(RequestIDMiddleware)
 app.add_middleware(AccessLogMiddleware)
+app.add_middleware(RequestIDMiddleware)
 _cors_allow_origins = [origin for origin in CORS_ORIGINS if origin != "*"]
 _cors_allow_origin_regex = None
 _cors_allow_credentials = True
