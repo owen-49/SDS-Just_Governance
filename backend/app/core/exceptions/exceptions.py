@@ -43,11 +43,11 @@ class BizError(Exception):
     """
     def __init__(self, http_status: int, code: int | BizCode, message: Optional[str] = None,
                  data: Optional[Any] = None, headers: dict[str, str] | None = None):
-        self.http_status = int(http_status)
-        self.code = int(code)
-        self.message = message or label_for(self.code)
-        self.data = data
-        self.headers = headers  # NEW
+        self.http_status = int(http_status) # HTTP状态码
+        self.code = int(code)   # 业务码
+        self.message = message or label_for(self.code)  # 消息
+        self.data = data    # 数据
+        self.headers = headers  # 响应头
         super().__init__(self.message)
 
 
@@ -87,7 +87,6 @@ def _log_error(level: str, request: Request, http_status: int, code: int, error_
 
 # 1) 业务层异常处理：
 async def handle_biz_error(request: Request, exc: BizError) -> JSONResponse:
-    # 仅做一致性“提示性”校验：如果 code 的典型 http_hint 与传入 http 不一致，打告警日志（不强改）
     try:
         hint = CODE_TO_HTTP_HINT.get(BizCode(exc.code))
         if hint and hint != exc.http_status:
@@ -98,8 +97,9 @@ async def handle_biz_error(request: Request, exc: BizError) -> JSONResponse:
             }})
     except Exception:
         pass
-
+    # 输出异常日志
     _log_error("warning", request, exc.http_status, exc.code, exc.message)
+    # 构造失败响应
     return fail(http_status=exc.http_status, code=exc.code, message=exc.message, data=exc.data, request=request)
 
 
@@ -109,13 +109,10 @@ async def handle_http_exception(request: Request, exc: HTTPException) -> JSONRes
     http_status = exc.status_code
     code = int(default_biz_for_http(http_status))
 
-    # message 的选择：
-    # - detail 是“安全字符串”时直接透出（调试友好）；
-    # - 否则用码表默认 label；若 detail 为结构化（dict/list），则放入 data.detail。
-    if isinstance(exc.detail, str) and exc.detail:
+    if isinstance(exc.detail, str) and exc.detail:  # 如果ex.detail是非空字符串
         message = exc.detail
         data = None
-    else:
+    else:   # 如果ex.detail是结构体（字典/列表/None）
         message = label_for(code)
         data = {"detail": exc.detail} if exc.detail not in (None, "") else None
 
@@ -134,7 +131,6 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
     http_status = 422
     code = int(BizCode.VALIDATION_ERROR)
     message = label_for(code)
-    # Pydantic/FastAPI 的标准字段错误结构；前端据此逐字段渲染
     data = {"errors": exc.errors()}
     _log_error("warning", request, http_status, code, message, error_extra={"errors": data["errors"]})
     return fail(http_status=http_status, code=code, message=message, data=data, request=request)

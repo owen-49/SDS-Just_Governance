@@ -1,6 +1,7 @@
 # backend/app/core/rich_extra_handler.py
 from __future__ import annotations
 import logging
+import time
 from typing import Any, Optional
 
 from rich.logging import RichHandler
@@ -40,6 +41,8 @@ class ExtraRichHandler(RichHandler):
 
         extra_obj = getattr(record, self._extra_attr, None)
         if isinstance(extra_obj, dict) and extra_obj:
+
+            extra_obj.update({"timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(record.created))})
             # 用 Pretty 把 dict 漂亮地打印（带缩进、折行、类型高亮）
             pretty = Pretty(
                 extra_obj,
