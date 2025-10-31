@@ -17,6 +17,7 @@ from dataclasses import dataclass
 # 业务码枚举类：防止乱填业务码
 class BizCode(IntEnum):
     # 成功
+
     OK = 0
 
     # 1xxx 鉴权/权限
@@ -61,9 +62,11 @@ class BizCode(IntEnum):
 
     # 8xxx 流控
     RATE_LIMITED = 8001
+    TOO_MANY_REQUESTS = 8002
 
     # 9xxx 系统/未知
     INTERNAL_ERROR = 9001
+    TRY_AGAIN = 9002
 
 
 @dataclass(frozen=True)

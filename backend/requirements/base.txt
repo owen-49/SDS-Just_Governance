@@ -4,8 +4,6 @@
 #
 #    pip-compile --cert=None --client-cert=None --index-url=None --output-file=base.txt --pip-args=None base.in
 #
-aiosqlite==0.20.0
-    # via -r base.in
 alembic==1.16.5
     # via -r base.in
 annotated-types==0.7.0
@@ -78,6 +76,8 @@ pydantic-core==2.33.2
 pyjwt==2.10.1
     # via -r base.in
 python-dotenv==1.1.1
+    # via -r base.in
+redis==6.4.0
     # via -r base.in
 requests==2.32.5
     # via resend

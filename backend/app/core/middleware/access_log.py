@@ -20,7 +20,7 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
 
         # 从请求对象request中获取request.state.request_id：
-            # 说明：request_id 是之前的中间件request_id注入的，用于串联整条请求链日志。
+            # 说明：request_id 是上游中间件request_id注入的，用于串联整条请求链日志。
         rid = getattr(getattr(request, "state", None), "request_id", None)
 
         try:
@@ -34,13 +34,10 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             # 计算本次请求响应总耗时
             latency_ms = int((time.perf_counter() - start) * 1000)
 
-            # 如果response存在，取它的HTTP状态码。如果不存在，记为0。
+            # 如果response存在，取它的HTTP状态码。
             status = getattr(locals().get("response", None), "status_code", 0)
-                # reponse不存在的情况是什么？
-                #   -- 它的下游抛异常的时候，就没有response了。因为它的下游只会抛异常抛到try语句块里，而不是返回response
-                #   -- 注意，全局异常处理器处在所有我们自定义中间件的上游，也就是这个访问日志中间件的上游，因此在到达这个中间件之前，异常肯定还没被处理。
 
-            # 写一条日志
+            # 写一条访问日志
             _access_logger.info(
                 "",
                 extra={
